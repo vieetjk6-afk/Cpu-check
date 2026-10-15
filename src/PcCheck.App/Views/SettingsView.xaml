@@ -67,6 +67,103 @@
                 </StackPanel>
             </Border>
 
+            <!-- Cập nhật phần mềm -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14" DataContext="{Binding Main.Updates}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{l:T settings.update}" Style="{StaticResource H2}" />
+                            <TextBlock Text="{Binding CurrentText}" Style="{StaticResource Caption}" Margin="0,3,0,0" />
+                        </StackPanel>
+                        <Border Grid.Column="1" Style="{StaticResource Badge}" VerticalAlignment="Top" Background="{StaticResource SuccessSoftBrush}"
+                                Visibility="{Binding IsAvailable, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="{Binding LatestVersion}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" />
+                        </Border>
+                    </Grid>
+
+                    <!-- Trạng thái -->
+                    <Border Style="{StaticResource SubCard}" Margin="0,0,0,12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock FontSize="16" VerticalAlignment="Top" Margin="0,1,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+                                        <Setter Property="Text" Value="&#xE895;" />
+                                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding State}" Value="UpToDate">
+                                                <Setter Property="Text" Value="&#xE73E;" />
+                                                <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding State}" Value="Available">
+                                                <Setter Property="Text" Value="&#xE896;" />
+                                                <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding State}" Value="Failed">
+                                                <Setter Property="Text" Value="&#xE783;" />
+                                                <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                <TextBlock Text="{Binding StatusText}" Style="{StaticResource Body}" Foreground="{DynamicResource TextBrush}" />
+                                <ProgressBar Margin="0,8,0,0" Maximum="100" Value="{Binding Progress, Mode=OneWay}"
+                                             Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVis}}" />
+                                <TextBlock Text="{Binding ManualHint}" Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap" TextTrimming="None"
+                                           Visibility="{Binding ShowManualHint, Converter={StaticResource BoolToVis}}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Có gì mới -->
+                    <StackPanel Visibility="{Binding HasNotes, Converter={StaticResource BoolToVis}}" Margin="0,0,0,12">
+                        <TextBlock Text="{l:T update.whats_new}" Style="{StaticResource H3}" Margin="0,0,0,6" />
+                        <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="12,10" MaxHeight="220"
+                                Background="{DynamicResource WindowBackgroundBrush}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <TextBlock Text="{Binding ReleaseNotes}" Style="{StaticResource Body}" TextWrapping="Wrap" />
+                            </ScrollViewer>
+                        </Border>
+                    </StackPanel>
+
+                    <WrapPanel Margin="0,0,0,14">
+                        <Button Style="{StaticResource PrimaryButton}" Command="{Binding InstallCommand}" Margin="0,0,10,6"
+                                Visibility="{Binding CanInstall, Converter={StaticResource BoolToVis}}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE896;" Foreground="White" FontSize="14" />
+                                <TextBlock Text="{l:T update.install}" Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding CheckCommand}" Margin="0,0,10,6">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" FontSize="13" />
+                                <TextBlock Text="{l:T update.check}" Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding OpenPageCommand}" Content="{l:T update.view}" Margin="0,0,10,6" />
+                        <Button Style="{StaticResource GhostButton}" Command="{Binding SkipCommand}" Content="{l:T update.skip}" Margin="0,0,10,6"
+                                Visibility="{Binding IsAvailable, Converter={StaticResource BoolToVis}}" />
+                    </WrapPanel>
+
+                    <Grid>
+                        <StackPanel Margin="0,0,80,0">
+                            <TextBlock Text="{l:T update.auto}" Style="{StaticResource H3}" />
+                            <TextBlock Text="{l:T update.auto_desc}" Style="{StaticResource Caption}" TextWrapping="Wrap" TextTrimming="None" />
+                        </StackPanel>
+                        <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding AutoCheck}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
             <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                 <StackPanel>
                     <TextBlock Text="{l:T settings.report}" Style="{StaticResource H2}" Margin="0,0,0,8" />

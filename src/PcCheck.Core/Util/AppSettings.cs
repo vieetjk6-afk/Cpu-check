@@ -16,6 +16,14 @@ public sealed class AppSettings
 
     public WidgetSettings Widget { get; set; } = new();
 
+    /// <summary>Tự kiểm tra bản mới trên GitHub khi mở ứng dụng.</summary>
+    public bool AutoCheckUpdates { get; set; } = true;
+
+    public DateTime? LastUpdateCheckUtc { get; set; }
+
+    /// <summary>Phiên bản người dùng chọn "Bỏ qua" – không nhắc lại cho tới khi có bản mới hơn.</summary>
+    public string? SkippedVersion { get; set; }
+
     public static string FilePath { get; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PcCheck", "settings.json");
 

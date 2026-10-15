@@ -1,7 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Security.AccessControl;
-using System.Security.Principal;
 using PcCheck.Core.Fixes;
 using PcCheck.Core.Util;
 using static PcCheck.Core.Localization.LocFactory;
@@ -54,7 +52,7 @@ public static class PawnIoInstaller
         string dir;
         try
         {
-            dir = CreateWorkDirectory(elevated);
+            dir = SecureTemp.CreateDirectory("pawnio");
         }
         catch (Exception ex)
         {
@@ -136,7 +134,7 @@ public static class PawnIoInstaller
         }
         finally
         {
-            if (!keepFiles) DeleteDirectory(dir);
+            if (!keepFiles) SecureTemp.Delete(dir);
         }
     }
 
@@ -174,41 +172,6 @@ public static class PawnIoInstaller
         }
     }
 
-    /// <summary>
-    /// Khi chạy với quyền admin: thư mục riêng trong ProgramData chỉ Administrators / SYSTEM ghi được, để tiến trình
-    /// thường của người dùng không thể thay tệp cài trước khi nó chạy với quyền cao. Chưa có quyền admin thì dùng %TEMP%
-    /// (Windows sẽ hỏi UAC và hiện nhà phát hành của tệp).
-    /// </summary>
-    private static string CreateWorkDirectory(bool elevated)
-    {
-        var name = "pawnio-" + Guid.NewGuid().ToString("N");
-        if (!elevated || !OperatingSystem.IsWindows())
-        {
-            var temp = Path.Combine(Path.GetTempPath(), name);
-            Directory.CreateDirectory(temp);
-            return temp;
-        }
-
-        var parent = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "PcCheck");
-        Directory.CreateDirectory(parent);
-        var security = new DirectorySecurity();
-        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
-        foreach (var sid in new[] { WellKnownSidType.BuiltinAdministratorsSid, WellKnownSidType.LocalSystemSid })
-        {
-            security.AddAccessRule(new FileSystemAccessRule(
-                new SecurityIdentifier(sid, null),
-                FileSystemRights.FullControl,
-                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
-                PropagationFlags.None,
-                AccessControlType.Allow));
-        }
-
-        security.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
-        var path = Path.Combine(parent, name);
-        new DirectoryInfo(path).Create(security);
-        return path;
-    }
-
     private static void FinishBackground(Process process, string dir)
     {
         lock (Sync)
@@ -224,22 +187,9 @@ public static class PawnIoInstaller
         {
         }
 
-        DeleteDirectory(dir);
+        SecureTemp.Delete(dir);
     }
 
-    private static void DeleteDirectory(string dir)
-    {
-        try
-        {
-            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
-        }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
-    }
 }
 
 /// <summary>Kiểm tra chữ ký số Authenticode của tệp thực thi bằng WinVerifyTrust (giống Windows khi chạy file tải về).</summary>

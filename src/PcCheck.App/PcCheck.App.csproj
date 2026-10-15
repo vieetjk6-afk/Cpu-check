@@ -18,6 +18,11 @@
     <ProjectReference Include="..\PcCheck.Core\PcCheck.Core.csproj" />
   </ItemGroup>
 
+  <!-- Loại bản phát hành (portable / small) do CI truyền vào, để trình cập nhật tải đúng tệp. -->
+  <ItemGroup Condition="'$(PcCheckFlavor)' != ''">
+    <AssemblyMetadata Include="PcCheckFlavor" Value="$(PcCheckFlavor)" />
+  </ItemGroup>
+
   <ItemGroup>
     <Resource Include="Assets\app.png" />
     <Resource Include="Assets\app.ico" />

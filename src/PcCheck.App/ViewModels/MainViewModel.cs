@@ -68,6 +68,7 @@ public sealed class MainViewModel : ObservableObject
         Issues = new IssuesViewModel(this);
         Settings = new SettingsViewModel(this);
         Widget = new WidgetViewModel(this);
+        Updates = new UpdateViewModel(this);
 
         NavItems =
         [
@@ -123,6 +124,7 @@ public sealed class MainViewModel : ObservableObject
     public IssuesViewModel Issues { get; }
     public SettingsViewModel Settings { get; }
     public WidgetViewModel Widget { get; }
+    public UpdateViewModel Updates { get; }
 
     public ObservableCollection<NavItem> NavItems { get; }
     public NavItem SettingsNav { get; }

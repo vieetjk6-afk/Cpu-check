@@ -4,6 +4,7 @@ using PcCheck.App.Infrastructure;
 using PcCheck.App.ViewModels;
 using PcCheck.App.Views;
 using PcCheck.Core.Localization;
+using PcCheck.Core.Updates;
 using PcCheck.Core.Util;
 
 namespace PcCheck.App;
@@ -38,9 +39,24 @@ public partial class App : Application
         };
 
         // Chỉ cho chạy 1 phiên bản: lần mở thứ hai sẽ đánh thức phiên bản đang chạy rồi thoát.
-        _instanceMutex = new Mutex(true, MutexName, out var isFirst);
+        // Ngay sau khi tự cập nhật: chờ phiên bản cũ thoát hẳn (tối đa 30 giây) thay vì đánh thức nó.
+        var afterUpdate = e.Args.Any(a => a.Equals(UpdateService.AfterUpdateArgument, StringComparison.OrdinalIgnoreCase));
+        _instanceMutex = new Mutex(false, MutexName);
+        bool isFirst;
+        try
+        {
+            isFirst = _instanceMutex.WaitOne(afterUpdate ? TimeSpan.FromSeconds(30) : TimeSpan.Zero);
+        }
+        catch (AbandonedMutexException)
+        {
+            // Phiên bản trước thoát mà không trả mutex – coi như đã có quyền.
+            isFirst = true;
+        }
+
         if (!isFirst)
         {
+            _instanceMutex.Dispose();
+            _instanceMutex = null;
             try
             {
                 using var existing = EventWaitHandle.OpenExisting(ActivateEventName);
@@ -90,6 +106,15 @@ public partial class App : Application
         ListenForActivation();
         _startupComplete = true;
         _ = StartBackgroundAsync(_main, settings, autoScan: settings.AutoScanOnStartup && !widgetOnly);
+
+        if (Environment.ProcessPath is { } exe) _ = UpdateService.CleanupAsync(exe);
+        if (afterUpdate)
+        {
+            Log.Info($"Đã cập nhật lên {_main.AppVersion}");
+            _main.ShowToast(Loc.F("update.done", _main.AppVersion));
+        }
+
+        _ = _main.Updates.AutoCheckAsync();
     }
 
     private static async Task StartBackgroundAsync(MainViewModel main, AppSettings settings, bool autoScan)

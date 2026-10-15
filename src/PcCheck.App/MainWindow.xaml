@@ -30,6 +30,24 @@
                 </StackPanel>
 
                 <StackPanel DockPanel.Dock="Bottom">
+                    <!-- Có bản cập nhật -->
+                    <Button Style="{StaticResource TileButton}" Margin="0,0,0,10" Padding="12,10" HorizontalContentAlignment="Stretch"
+                            Background="{StaticResource SuccessSoftBrush}" BorderBrush="{StaticResource SuccessBrush}"
+                            Command="{Binding NavigateCommand}" CommandParameter="settings" ToolTip="{l:T update.banner_tip}"
+                            Visibility="{Binding Updates.ShowBanner, Converter={StaticResource BoolToVis}}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE896;" Foreground="{StaticResource SuccessBrush}" FontSize="15" />
+                            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                <TextBlock Text="{Binding Updates.BannerText}" FontWeight="SemiBold" FontSize="12.5" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{l:T update.banner_action}" Style="{StaticResource Caption}" />
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+
                     <Border Style="{StaticResource SubCard}" Margin="0,0,0,10" Padding="12">
                         <StackPanel>
                             <Button Style="{StaticResource PrimaryButton}" Command="{Binding ScanCommand}" HorizontalAlignment="Stretch">
