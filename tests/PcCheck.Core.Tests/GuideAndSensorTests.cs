@@ -232,6 +232,72 @@ public sealed class GuideAndSensorTests
         Assert.Equal(expected, SensorReading.DriveNumberOf(id));
     }
 
+    private static SensorReading Nvme(string name, float? value, float? min = null) =>
+        new($"/nvme/0/temperature/{name}", "Samsung SSD 980", SensorHardwareKind.Storage, name, SensorKind.Temperature, value, min, value, "/nvme/0");
+
+    [Theory]
+    [InlineData("Warning Temperature", true)]
+    [InlineData("Critical Temperature", true)]
+    [InlineData("Temperature Limit", true)]
+    [InlineData("TjMax", true)]
+    [InlineData("CPU Core #1 Distance to TjMax", false)]
+    [InlineData("Composite Temperature", false)]
+    [InlineData("Core Max", false)]
+    public void TemperatureLimitsAreRecognised(string name, bool isLimit)
+    {
+        Assert.Equal(isLimit, Nvme(name, 80).IsTemperatureLimit);
+    }
+
+    [Fact]
+    public void DriveLimitsAreNotCountedAsTemperature()
+    {
+        var snapshot = new SensorSnapshot
+        {
+            Readings =
+            [
+                Nvme("Composite Temperature", 43),
+                Nvme("Temperature #2", 46),
+                Nvme("Warning Temperature", 81),
+                Nvme("Critical Temperature", 84),
+            ],
+        };
+
+        Assert.Equal(46, snapshot.MaxStorageTemperature);
+        Assert.Equal(46, Assert.Single(snapshot.DeviceTemperatures()).Celsius);
+    }
+
+    [Fact]
+    public void CpuFallbackIgnoresDistanceToTjMax()
+    {
+        var readings = new List<SensorReading>
+        {
+            new("/intelcpu/0/temperature/1", "CPU", SensorHardwareKind.Cpu, "CPU Core #1", SensorKind.Temperature, 55, null, null),
+            new("/intelcpu/0/temperature/9", "CPU", SensorHardwareKind.Cpu, "CPU Core #1 Distance to TjMax", SensorKind.Temperature, 45, null, null),
+            new("/intelcpu/0/temperature/10", "CPU", SensorHardwareKind.Cpu, "TjMax", SensorKind.Temperature, 100, null, null),
+        };
+        Assert.Equal(55, SensorSnapshot.PickCpuTemperature(readings));
+    }
+
+    [Fact]
+    public void RangesIgnoreZeroTemperatureReadings()
+    {
+        var ranges = new Dictionary<string, (float Min, float Max)>();
+
+        var first = new List<SensorReading> { Nvme("Composite Temperature", 0, 0) };
+        Sensors.SensorService.ApplyRanges(first, ranges);
+        Assert.Null(first[0].Value);
+        Assert.Null(first[0].Min);
+
+        var second = new List<SensorReading> { Nvme("Composite Temperature", 43, 0) };
+        Sensors.SensorService.ApplyRanges(second, ranges);
+        var third = new List<SensorReading> { Nvme("Composite Temperature", 47, 0) };
+        Sensors.SensorService.ApplyRanges(third, ranges);
+
+        Assert.Equal(43, third[0].Min);
+        Assert.Equal(47, third[0].Max);
+        Assert.Equal(47, third[0].Value);
+    }
+
     [Fact]
     public void WidgetCollapsedSettingRoundTrips()
     {

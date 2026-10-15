@@ -230,13 +230,15 @@ public sealed class HealthViewModel : PageViewModel
             var kind = isAcpi ? SensorHardwareKind.Other : first.HardwareKind;
             seen.Add(group.Key);
             var card = GetOrCreate(group.Key, CardName(group.Key, first.Hardware, hw, c), kind, isAcpi, first.DriveNumber);
-            foreach (var reading in group)
+            var groupReadings = group.ToList();
+            foreach (var reading in groupReadings)
             {
-                if (reading.Kind == SensorKind.Other) continue;
-                card.Apply(reading, c, TempSeverity);
+                // Ngưỡng do thiết bị báo (Warning/Critical Temperature...) không phải số đo -> hiện ở phần thông tin.
+                if (reading.Kind == SensorKind.Other || reading.IsTemperatureLimit) continue;
+                card.Apply(reading, c, r => TempSeverity(r, groupReadings));
             }
 
-            UpdateSummary(card, group.ToList(), live, hw, c);
+            UpdateSummary(card, groupReadings, live, hw, c);
         }
 
         // Thiết bị không còn cảm biến (vd vùng nhiệt ACPI sau khi đã có cảm biến CPU thật, ổ USB đã rút) -> bỏ thẻ cũ.
@@ -397,7 +399,7 @@ public sealed class HealthViewModel : PageViewModel
     /// <summary>Giá trị tóm tắt ở tiêu đề thẻ + phần thông tin thiết bị lấy từ kết quả quét.</summary>
     private void UpdateSummary(DeviceCard card, IReadOnlyList<SensorReading> readings, SensorSnapshot live, HardwareInfo? hw, CultureInfo c)
     {
-        float? MaxTemp() => readings.Where(r => r.Kind == SensorKind.Temperature && r.Value is > 0 and < 150).Select(r => r.Value).DefaultIfEmpty(null).Max();
+        float? MaxTemp() => readings.Where(r => r.IsMeasuredTemperature).Select(r => r.Value).DefaultIfEmpty(null).Max();
         float? Find(SensorKind kind, params string[] names) => SensorSnapshot.Pick(readings, card.Kind, kind, names);
 
         switch (card.Key == "acpi" ? (SensorHardwareKind?)null : card.Kind)
@@ -498,7 +500,9 @@ public sealed class HealthViewModel : PageViewModel
                 var disk = FindDisk(card, hw);
                 var solid = disk?.IsSolidState ?? true;
                 var temp = MaxTemp() ?? disk?.TemperatureC;
-                SetPrimaryTemp(card, temp, solid ? Thresholds.SsdTempWarn : Thresholds.HddTempWarn, solid ? Thresholds.SsdTempCritical : Thresholds.HddTempCritical, c);
+                var (warn, critical) = DeviceLimits(readings,
+                    solid ? Thresholds.SsdTempWarn : Thresholds.HddTempWarn, solid ? Thresholds.SsdTempCritical : Thresholds.HddTempCritical);
+                SetPrimaryTemp(card, temp, warn, critical, c);
                 var life = Find(SensorKind.Level, "Remaining Life", "Available Spare") ?? (disk?.WearPercent is { } w ? 100 - w : null);
                 var activity = Find(SensorKind.Load, "Total Activity");
                 card.Secondary = Join(life is null ? null : Loc.F("device.life", Format.Percent(life, c)), activity is null ? null : Loc.F("device.busy", Format.Percent(activity, c)));
@@ -570,6 +574,39 @@ public sealed class HealthViewModel : PageViewModel
                 SetPrimaryTemp(card, MaxTemp(), 80, 95, c);
                 break;
         }
+
+        // Ngưỡng nhiệt do chính thiết bị báo (vd ổ NVMe: Warning / Critical Temperature) -> hiện như thông tin.
+        var limitItems = readings.Where(r => r.IsTemperatureLimit && r.Value is > 0 and < 150)
+            .Select(r => new InfoItem(LimitLabel(r), Format.Celsius(r.Value, c)))
+            .DistinctBy(i => i.Label)
+            .ToList();
+        if (limitItems.Count > 0)
+        {
+            var labels = limitItems.Select(i => i.Label).ToHashSet(StringComparer.Ordinal);
+            card.Info = [.. card.Info.Where(i => !labels.Contains(i.Label)), .. limitItems];
+        }
+    }
+
+    private static string LimitLabel(SensorReading r) =>
+        r.Name.Contains("Warning", StringComparison.OrdinalIgnoreCase) ? Loc.T("device.limit_warning")
+        : r.Name.Contains("Critical", StringComparison.OrdinalIgnoreCase) ? Loc.T("device.limit_critical")
+        : r.Name;
+
+    /// <summary>
+    /// Ngưỡng dùng để tô màu: ngưỡng của ứng dụng, hạ xuống theo ngưỡng thiết bị tự báo nếu thiết bị đặt thấp hơn
+    /// (an toàn trước, và khớp với cảnh báo trong danh sách lỗi).
+    /// </summary>
+    private static (double Warn, double Critical) DeviceLimits(IEnumerable<SensorReading> readings, double warn, double critical)
+    {
+        float? Limit(string word) => readings
+            .Where(r => r.IsTemperatureLimit && r.Value is > 30 and < 130 && r.Name.Contains(word, StringComparison.OrdinalIgnoreCase))
+            .Select(r => r.Value)
+            .DefaultIfEmpty(null)
+            .Min();
+
+        var w = Math.Min(warn, Limit("Warning") ?? warn);
+        var cr = Math.Min(critical, Limit("Critical") ?? critical);
+        return (w, Math.Max(w, cr));
     }
 
     private static string Join(params string?[] parts) => string.Join(" · ", parts.Where(p => !string.IsNullOrEmpty(p)));
@@ -590,8 +627,11 @@ public sealed class HealthViewModel : PageViewModel
             : Loc.T("health.temp_high");
     }
 
-    private Severity TempSeverity(SensorReading r)
+    private static Severity TempSeverity(SensorReading r, IReadOnlyList<SensorReading> device)
     {
+        // "Distance to TjMax" là khoảng cách tới ngưỡng, không phải nhiệt độ.
+        if (r.IsTemperatureHeadroom) return Severity.Ok;
+
         // Vùng nhiệt ACPI chỉ là ước lượng -> tối đa "cảnh báo".
         if (r.Id.StartsWith(ThermalZoneReader.IdPrefix, StringComparison.Ordinal))
         {
@@ -606,7 +646,8 @@ public sealed class HealthViewModel : PageViewModel
             SensorHardwareKind.Storage => (Thresholds.SsdTempWarn, Thresholds.SsdTempCritical),
             _ => (80d, 95d),
         };
-        return Thresholds.TemperatureSeverity(r.Value, warn, critical);
+        var limits = DeviceLimits(device, warn, critical);
+        return Thresholds.TemperatureSeverity(r.Value, limits.Warn, limits.Critical);
     }
 
     private static string GlyphFor(SensorHardwareKind kind) => kind switch

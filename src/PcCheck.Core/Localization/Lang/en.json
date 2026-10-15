@@ -248,6 +248,8 @@
   "device.busy": "Busy {0}",
   "device.wear": "Wear {0}",
   "device.disk_number": "Disk {0}",
+  "device.limit_warning": "Warning limit (reported by device)",
+  "device.limit_critical": "Critical limit (reported by device)",
   "device.zones": "{0} thermal zones",
   "device.temp_source": "Temperature source",
   "device.source_sensor": "CPU sensor (accurate)",

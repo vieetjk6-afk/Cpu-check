@@ -248,6 +248,8 @@
   "device.busy": "Bận {0}",
   "device.wear": "Chai {0}",
   "device.disk_number": "Ổ số {0}",
+  "device.limit_warning": "Ngưỡng cảnh báo (thiết bị tự báo)",
+  "device.limit_critical": "Ngưỡng tới hạn (thiết bị tự báo)",
   "device.zones": "{0} vùng nhiệt",
   "device.temp_source": "Nguồn nhiệt độ",
   "device.source_sensor": "Cảm biến CPU (chính xác)",

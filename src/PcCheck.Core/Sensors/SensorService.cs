@@ -14,6 +14,7 @@ namespace PcCheck.Core.Sensors;
 public sealed class SensorService : IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly Dictionary<string, (float Min, float Max)> _ranges = new(StringComparer.Ordinal);
     private readonly ThermalZoneReader _thermalZones = new();
     private Computer? _computer;
     private bool _openFailed;
@@ -161,12 +162,43 @@ public sealed class SensorService : IDisposable
         // Không có cảm biến nhiệt độ CPU (chưa có driver hoặc LibreHardwareMonitor lỗi) -> dùng vùng nhiệt ACPI của Windows.
         if (SensorSnapshot.PickCpuTemperature(readings) is null) readings.AddRange(_thermalZones.Read());
 
+        ApplyRanges(readings, _ranges);
+
         return new SensorSnapshot
         {
             Readings = readings,
             PawnIoInstalled = _pawnIo,
             Available = readings.Count > 0,
         };
+    }
+
+    /// <summary>
+    /// Thấp nhất / cao nhất tự theo dõi từ lúc mở ứng dụng, bỏ qua số đo vô lý. Min/Max của LibreHardwareMonitor giữ cả
+    /// lần đọc đầu tiên bằng 0 (vd ổ NVMe) nên "thấp nhất" luôn hiện 0 °C. Nhiệt độ ≤ 0 °C coi như chưa đọc được.
+    /// </summary>
+    internal static void ApplyRanges(List<SensorReading> readings, Dictionary<string, (float Min, float Max)> ranges)
+    {
+        for (var i = 0; i < readings.Count; i++)
+        {
+            var r = readings[i];
+            var valid = r.Value is { } v && (r.Kind != SensorKind.Temperature || v is > 0 and < 150);
+            if (!valid)
+            {
+                var hasRange = ranges.TryGetValue(r.Id, out var old);
+                readings[i] = r with
+                {
+                    Value = r.Kind == SensorKind.Temperature ? null : r.Value,
+                    Min = hasRange ? old.Min : null,
+                    Max = hasRange ? old.Max : null,
+                };
+                continue;
+            }
+
+            var value = r.Value!.Value;
+            var range = ranges.TryGetValue(r.Id, out var prev) ? (Math.Min(prev.Min, value), Math.Max(prev.Max, value)) : (value, value);
+            ranges[r.Id] = range;
+            readings[i] = r with { Min = range.Item1, Max = range.Item2 };
+        }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

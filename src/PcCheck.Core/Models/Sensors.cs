@@ -54,6 +54,23 @@ public sealed record SensorReading(
     /// <summary>Số ổ vật lý (PhysicalDriveN) của cảm biến ổ cứng, lấy từ định danh "/nvme/N", "/hdd/N"...</summary>
     public string? DriveNumber => HardwareKind == SensorHardwareKind.Storage ? DriveNumberOf(HardwareId) : null;
 
+    /// <summary>
+    /// Cảm biến "nhiệt độ" thực chất là ngưỡng do thiết bị tự báo (vd "Warning Temperature" / "Critical Temperature" của ổ NVMe,
+    /// "Temperature Limit", "TjMax") – không phải số đo, không được tính là nhiệt độ hiện tại.
+    /// </summary>
+    public bool IsTemperatureLimit =>
+        Kind == SensorKind.Temperature
+        && (LimitWords.Any(w => Name.Contains(w, StringComparison.OrdinalIgnoreCase))
+            || (Name.Contains("TjMax", StringComparison.OrdinalIgnoreCase) && !IsTemperatureHeadroom));
+
+    /// <summary>"Distance to TjMax": khoảng cách tới ngưỡng (càng nhỏ càng nóng), không phải nhiệt độ.</summary>
+    public bool IsTemperatureHeadroom => Kind == SensorKind.Temperature && Name.Contains("Distance", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Số đo nhiệt độ thật, hợp lệ (bỏ ngưỡng, khoảng cách tới TjMax và giá trị vô lý).</summary>
+    public bool IsMeasuredTemperature => Kind == SensorKind.Temperature && !IsTemperatureLimit && !IsTemperatureHeadroom && Value is > 0 and < 150;
+
+    private static readonly string[] LimitWords = ["Warning", "Critical", "Limit", "Threshold", "Shutdown"];
+
     public static string? DriveNumberOf(string? hardwareId)
     {
         if (string.IsNullOrEmpty(hardwareId)) return null;
@@ -142,7 +159,7 @@ public sealed class SensorSnapshot
     }
 
     public float? MaxStorageTemperature =>
-        Readings.Where(r => r.HardwareKind == SensorHardwareKind.Storage && r.Kind == SensorKind.Temperature && r.Value is > 0 and < 150)
+        Readings.Where(r => r.HardwareKind == SensorHardwareKind.Storage && r.IsMeasuredTemperature)
             .Select(r => r.Value)
             .DefaultIfEmpty(null)
             .Max();
@@ -159,7 +176,7 @@ public sealed class SensorSnapshot
             var readings = group.ToList();
             var temp = group.Key.HardwareKind == SensorHardwareKind.Cpu
                 ? PickCpuTemperature(readings)
-                : readings.Where(r => r.Kind == SensorKind.Temperature && r.Value is > 0 and < 150).Select(r => r.Value).DefaultIfEmpty(null).Max();
+                : readings.Where(r => r.IsMeasuredTemperature).Select(r => r.Value).DefaultIfEmpty(null).Max();
             if (temp is not null) list.Add(new DeviceTemperature(readings[0].Hardware, group.Key.HardwareKind, temp.Value, false));
         }
 
@@ -186,7 +203,7 @@ public sealed class SensorSnapshot
     public static float? PickCpuTemperature(IReadOnlyList<SensorReading> readings)
     {
         var temps = readings
-            .Where(r => r.HardwareKind == SensorHardwareKind.Cpu && r.Kind == SensorKind.Temperature && r.Value is > 0 and < 150)
+            .Where(r => r.HardwareKind == SensorHardwareKind.Cpu && r.IsMeasuredTemperature)
             .ToList();
         if (temps.Count == 0) return null;
 
@@ -202,7 +219,8 @@ public sealed class SensorSnapshot
 
     public static float? Pick(IReadOnlyList<SensorReading> readings, SensorHardwareKind hw, SensorKind kind, params string[] names)
     {
-        var candidates = readings.Where(r => r.HardwareKind == hw && r.Kind == kind && r.Value is not null).ToList();
+        var candidates = readings.Where(r => r.HardwareKind == hw && r.Kind == kind && r.Value is not null
+                                             && (kind != SensorKind.Temperature || r.IsMeasuredTemperature)).ToList();
         if (candidates.Count == 0) return null;
         foreach (var name in names)
         {
@@ -210,6 +228,6 @@ public sealed class SensorSnapshot
             if (hit is not null) return hit.Value;
         }
 
-        return kind == SensorKind.Temperature ? candidates.Where(c => c.Value is > 0 and < 150).Max(c => c.Value) : candidates[0].Value;
+        return kind == SensorKind.Temperature ? candidates.Max(c => c.Value) : candidates[0].Value;
     }
 }
