@@ -92,6 +92,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          # Tag kiểu v1.3.0-beta -> pre-release: trình cập nhật trong ứng dụng bỏ qua.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             publish/PcCheck-portable-win-x64.zip
             publish/PcCheck-small-win-x64.zip

@@ -39,13 +39,14 @@ public partial class App : Application
         };
 
         // Chỉ cho chạy 1 phiên bản: lần mở thứ hai sẽ đánh thức phiên bản đang chạy rồi thoát.
-        // Ngay sau khi tự cập nhật: chờ phiên bản cũ thoát hẳn (tối đa 30 giây) thay vì đánh thức nó.
+        // Ngay sau khi tự cập nhật: chờ phiên bản cũ thoát hẳn (tối đa 2 phút) thay vì đánh thức nó; quá thời gian vẫn mở
+        // (phiên bản cũ đang thoát sẽ bỏ qua lời đánh thức, nếu không mở thì người dùng không còn gì đang chạy).
         var afterUpdate = e.Args.Any(a => a.Equals(UpdateService.AfterUpdateArgument, StringComparison.OrdinalIgnoreCase));
         _instanceMutex = new Mutex(false, MutexName);
         bool isFirst;
         try
         {
-            isFirst = _instanceMutex.WaitOne(afterUpdate ? TimeSpan.FromSeconds(30) : TimeSpan.Zero);
+            isFirst = _instanceMutex.WaitOne(afterUpdate ? TimeSpan.FromMinutes(2) : TimeSpan.Zero);
         }
         catch (AbandonedMutexException)
         {
@@ -53,7 +54,13 @@ public partial class App : Application
             isFirst = true;
         }
 
-        if (!isFirst)
+        if (!isFirst && afterUpdate)
+        {
+            Log.Warn("Phiên bản cũ chưa thoát sau 2 phút – vẫn mở bản mới");
+            _instanceMutex.Dispose();
+            _instanceMutex = null;
+        }
+        else if (!isFirst)
         {
             _instanceMutex.Dispose();
             _instanceMutex = null;

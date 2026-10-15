@@ -34,6 +34,27 @@ public sealed record UpdateCheckResult(UpdateStatus Status, ReleaseInfo? Release
 /// <summary>Bản cập nhật đã tải và giải nén, sẵn sàng thay thế tệp đang chạy.</summary>
 public sealed record PreparedUpdate(string Directory, string ExePath, string ExeSha256);
 
+/// <summary>Bản mới đã nằm ở chỗ exe cũ và đang bị khóa đọc; giữ tới khi tiến trình mới đã chạy.</summary>
+public sealed class InstalledUpdate(string currentExe, string oldExe, FileStream fileLock) : IDisposable
+{
+    private bool _done;
+
+    /// <summary>Không khởi động được bản mới -> trả exe cũ về chỗ cũ.</summary>
+    public void Rollback()
+    {
+        if (_done) return;
+        _done = true;
+        fileLock.Dispose();
+        UpdateService.Restore(currentExe, oldExe);
+    }
+
+    public void Dispose()
+    {
+        _done = true;
+        fileLock.Dispose();
+    }
+}
+
 /// <summary>Tệp tải về hỏng hoặc không khớp mã kiểm tra SHA-256 do GitHub cung cấp.</summary>
 public sealed class UpdateIntegrityException(string message) : Exception(message);
 
@@ -76,7 +97,7 @@ public static partial class UpdateService
         catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or JsonException or InvalidOperationException)
         {
             Log.Warn("Kiểm tra cập nhật lỗi", ex);
-            return new UpdateCheckResult(UpdateStatus.Failed, Error: ex is OperationCanceledException ? "timeout" : ex.Message);
+            return new UpdateCheckResult(UpdateStatus.Failed, Error: ErrorCode(ex));
         }
     }
 
@@ -120,16 +141,28 @@ public static partial class UpdateService
             assets);
     }
 
-    /// <summary>Tag v1.2.3 / 1.2 / v1.2.3-beta -> 1.2.3 / 1.2.0 / 1.2.3. Trả null nếu không phải số phiên bản.</summary>
+    /// <summary>Tag v1.2.3 / 1.2 / v2 / v1.2.3-beta -> 1.2.3 / 1.2.0 / 2.0.0 / 1.2.3. Trả null nếu không phải số phiên bản.</summary>
     public static Version? ParseVersion(string tag)
     {
         var text = tag.Trim();
         if (text.StartsWith('v') || text.StartsWith('V')) text = text[1..];
         var cut = text.IndexOfAny(['-', '+', ' ']);
         if (cut >= 0) text = text[..cut];
+        if (int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var major))
+            return new Version(major, 0, 0);
         if (!System.Version.TryParse(text, out var v)) return null;
         return Normalize(v);
     }
+
+    /// <summary>Mã lỗi ngắn để giao diện dịch: rate_limit, timeout, network, invalid hoặc "HTTP 500".</summary>
+    internal static string ErrorCode(Exception ex) => ex switch
+    {
+        HttpRequestException { StatusCode: HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests } => "rate_limit",
+        HttpRequestException { StatusCode: { } code } => $"HTTP {(int)code}",
+        HttpRequestException => "network",
+        OperationCanceledException => "timeout",
+        _ => "invalid",
+    };
 
     public static bool IsNewer(Version candidate, Version current) => Normalize(candidate) > Normalize(current);
 
@@ -202,40 +235,59 @@ public static partial class UpdateService
 
     /// <summary>
     /// Thay tệp đang chạy: đổi tên exe hiện tại thành ".old" (Windows cho đổi tên tệp đang chạy), chép bản mới vào chỗ cũ,
-    /// rồi khóa (chỉ cho đọc) và kiểm tra lại SHA-256. Người gọi giữ khóa tới khi đã khởi động tiến trình mới, để không
-    /// tiến trình nào tráo được tệp giữa lúc kiểm tra và lúc chạy. Lỗi -> khôi phục bản cũ.
+    /// rồi khóa (chỉ cho đọc) và kiểm tra lại SHA-256. Người gọi giữ <see cref="InstalledUpdate"/> tới khi đã khởi động
+    /// tiến trình mới (không tiến trình nào tráo được tệp giữa lúc kiểm tra và lúc chạy), và gọi
+    /// <see cref="InstalledUpdate.Rollback"/> nếu không khởi động được. Lỗi trong lúc thay -> tự khôi phục bản cũ.
     /// </summary>
-    public static FileStream Install(PreparedUpdate update, string currentExe)
+    public static InstalledUpdate Install(PreparedUpdate update, string currentExe)
     {
-        var old = OldPath(currentExe);
-        TryDelete(old);
-        File.Move(currentExe, old);
         try
         {
-            // Chép (không di chuyển) để tệp mới nhận quyền truy cập của thư mục đích, không mang ACL "chỉ admin".
-            File.Copy(update.ExePath, currentExe, overwrite: false);
-            var locked = new FileStream(currentExe, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var old = OldPath(currentExe);
+            File.Move(currentExe, old, overwrite: true);
+            FileStream? locked = null;
             try
             {
+                // Chép (không di chuyển) để tệp mới nhận quyền truy cập của thư mục đích, không mang ACL "chỉ admin".
+                File.Copy(update.ExePath, currentExe, overwrite: false);
+                locked = new FileStream(currentExe, FileMode.Open, FileAccess.Read, FileShare.Read);
                 if (!string.Equals(Sha256Of(locked), update.ExeSha256, StringComparison.OrdinalIgnoreCase))
                     throw new UpdateIntegrityException("installed file changed");
-                return locked;
+                return new InstalledUpdate(currentExe, old, locked);
             }
-            catch
+            catch (Exception ex)
             {
-                locked.Dispose();
+                locked?.Dispose();
+                Log.Warn("Thay tệp cập nhật lỗi, khôi phục bản cũ", ex);
+                Restore(currentExe, old);
                 throw;
             }
-        }
-        catch
-        {
-            TryDelete(currentExe);
-            File.Move(old, currentExe);
-            throw;
         }
         finally
         {
             SecureTemp.Delete(update.Directory);
+        }
+    }
+
+    /// <summary>Đưa exe cũ (".old") về chỗ cũ, ghi đè bản mới; thử lại vài lần nếu tệp đang bị phần mềm diệt virus mở.</summary>
+    internal static void Restore(string currentExe, string old)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                File.Move(old, currentExe, overwrite: true);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && attempt < 10)
+            {
+                Thread.Sleep(300);
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Không khôi phục được {currentExe} từ {old}", ex);
+                throw;
+            }
         }
     }
 

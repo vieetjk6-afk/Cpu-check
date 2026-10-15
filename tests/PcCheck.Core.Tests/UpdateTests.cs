@@ -42,6 +42,7 @@ public sealed class UpdateTests : IDisposable
     [InlineData("1.2", "1.2.0")]
     [InlineData("V2.0.1-beta.1", "2.0.1")]
     [InlineData("v1.0.0+build.5", "1.0.0")]
+    [InlineData("v2", "2.0.0")]
     public void VersionsAreParsedFromTags(string tag, string expected)
     {
         Assert.Equal(Version.Parse(expected), UpdateService.ParseVersion(tag));
@@ -139,9 +140,10 @@ public sealed class UpdateTests : IDisposable
         File.WriteAllText(current, "old");
         var prepared = Prepare("new");
 
-        using (var locked = UpdateService.Install(prepared, current))
+        using (UpdateService.Install(prepared, current))
         {
-            Assert.True(locked.CanRead);
+            // Đang bị khóa: không ghi được (Linux không áp dụng chia sẻ tệp kiểu Windows; CI chạy kiểm thử trên Windows).
+            if (OperatingSystem.IsWindows()) Assert.ThrowsAny<IOException>(() => File.WriteAllText(current, "tampered"));
         }
 
         Assert.Equal("new", File.ReadAllText(current));
@@ -160,6 +162,53 @@ public sealed class UpdateTests : IDisposable
 
         Assert.Equal("old", File.ReadAllText(current));
         Assert.False(File.Exists(UpdateService.OldPath(current)));
+    }
+
+    [Fact]
+    public void RollbackRestoresOldExecutable()
+    {
+        var current = Path.Combine(_dir, "PcCheck.exe");
+        File.WriteAllText(current, "old");
+        var installed = UpdateService.Install(Prepare("new"), current);
+
+        installed.Rollback();
+
+        Assert.Equal("old", File.ReadAllText(current));
+        Assert.False(File.Exists(UpdateService.OldPath(current)));
+    }
+
+    [Fact]
+    public void InstallReplacesLeftoverOldCopy()
+    {
+        var current = Path.Combine(_dir, "PcCheck.exe");
+        File.WriteAllText(current, "old");
+        File.WriteAllText(UpdateService.OldPath(current), "older");
+
+        using (UpdateService.Install(Prepare("new"), current))
+        {
+        }
+
+        Assert.Equal("new", File.ReadAllText(current));
+        Assert.Equal("old", File.ReadAllText(UpdateService.OldPath(current)));
+    }
+
+    [Fact]
+    public void FailedInstallStillRemovesDownloadFolder()
+    {
+        var prepared = Prepare("new");
+        Assert.ThrowsAny<IOException>(() => UpdateService.Install(prepared, Path.Combine(_dir, "missing", "PcCheck.exe")));
+        Assert.False(Directory.Exists(prepared.Directory));
+    }
+
+    [Fact]
+    public void ErrorsAreMappedToShortCodes()
+    {
+        Assert.Equal("rate_limit", UpdateService.ErrorCode(new HttpRequestException("x", null, System.Net.HttpStatusCode.Forbidden)));
+        Assert.Equal("rate_limit", UpdateService.ErrorCode(new HttpRequestException("x", null, System.Net.HttpStatusCode.TooManyRequests)));
+        Assert.Equal("HTTP 502", UpdateService.ErrorCode(new HttpRequestException("x", null, System.Net.HttpStatusCode.BadGateway)));
+        Assert.Equal("network", UpdateService.ErrorCode(new HttpRequestException("dns")));
+        Assert.Equal("timeout", UpdateService.ErrorCode(new TaskCanceledException()));
+        Assert.Equal("invalid", UpdateService.ErrorCode(new System.Text.Json.JsonException()));
     }
 
     [Fact]

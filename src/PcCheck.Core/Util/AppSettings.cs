@@ -21,6 +21,9 @@ public sealed class AppSettings
 
     public DateTime? LastUpdateCheckUtc { get; set; }
 
+    /// <summary>Tag bản mới tìm thấy ở lần kiểm tra gần nhất (để hiện lại thông báo sau khi mở lại ứng dụng).</summary>
+    public string? AvailableVersion { get; set; }
+
     /// <summary>Phiên bản người dùng chọn "Bỏ qua" – không nhắc lại cho tới khi có bản mới hơn.</summary>
     public string? SkippedVersion { get; set; }
 

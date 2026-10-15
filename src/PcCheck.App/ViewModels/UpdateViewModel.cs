@@ -87,7 +87,7 @@ public sealed class UpdateViewModel : ObservableObject
         UpdateState.UpToDate => Loc.F("update.up_to_date", CurrentVersion.ToString(3)),
         UpdateState.Available => Loc.F("update.available", LatestVersion, PublishedText),
         UpdateState.NoRelease => Loc.T("update.no_release"),
-        UpdateState.Failed => Loc.F("update.failed", _error ?? ""),
+        UpdateState.Failed => Loc.F("update.failed", ErrorText(_error)),
         UpdateState.Downloading => Loc.F("update.downloading", LatestVersion, Progress.ToString("0", CultureInfo.InvariantCulture)),
         UpdateState.Installing => Loc.T("update.installing"),
         _ => Settings.LastUpdateCheckUtc is { } last
@@ -124,7 +124,10 @@ public sealed class UpdateViewModel : ObservableObject
         {
             await Task.Delay(TimeSpan.FromSeconds(15));
             if (!AutoCheck || IsBusy) return;
-            if (Settings.LastUpdateCheckUtc is { } last && DateTime.UtcNow - last < AutoCheckInterval) return;
+
+            // Lần trước đã thấy bản mới -> kiểm tra lại ngay để hiện lại thông báo; không thì tối đa mỗi 12 giờ.
+            var knownUpdate = UpdateService.ParseVersion(Settings.AvailableVersion ?? "") is { } known && UpdateService.IsNewer(known, CurrentVersion);
+            if (!knownUpdate && Settings.LastUpdateCheckUtc is { } last && DateTime.UtcNow - last < AutoCheckInterval) return;
             await CheckAsync(silent: true);
             if (ShowBanner) _main.ShowToast(Loc.F("update.toast", LatestVersion));
         }
@@ -141,8 +144,15 @@ public sealed class UpdateViewModel : ObservableObject
         var result = await UpdateService.CheckAsync(CurrentVersion);
         _release = result.Release;
         _error = result.Error;
-        Settings.LastUpdateCheckUtc = DateTime.UtcNow;
-        Settings.Save();
+
+        // Chỉ ghi nhận lần kiểm tra thành công: lỗi mạng (vd vừa đăng nhập, Wi-Fi chưa có) không được hoãn lần sau 12 giờ.
+        if (result.Status != UpdateStatus.Failed)
+        {
+            Settings.LastUpdateCheckUtc = DateTime.UtcNow;
+            Settings.AvailableVersion = result.Status == UpdateStatus.Available ? result.Release?.Tag : null;
+            Settings.Save();
+        }
+
         State = result.Status switch
         {
             UpdateStatus.Available => UpdateState.Available,
@@ -172,14 +182,24 @@ public sealed class UpdateViewModel : ObservableObject
 
             State = UpdateState.Installing;
             var exe = Environment.ProcessPath!;
-            using (UpdateService.Install(prepared, exe))
+
+            // Chép + kiểm tra tệp lớn ở luồng nền để cửa sổ không bị đơ.
+            var installed = await Task.Run(() => UpdateService.Install(prepared, exe));
+            try
             {
                 // Giữ khóa tệp tới khi tiến trình mới đã chạy. Tiến trình mới chờ bản này thoát rồi mới mở.
-                Process.Start(new ProcessStartInfo(exe, UpdateService.AfterUpdateArgument)
+                using var started = Process.Start(new ProcessStartInfo(exe, UpdateService.AfterUpdateArgument)
                 {
                     UseShellExecute = false,
                     WorkingDirectory = Path.GetDirectoryName(exe)!,
-                });
+                }) ?? throw new InvalidOperationException("Process.Start returned null");
+                installed.Dispose();
+            }
+            catch
+            {
+                // Không chạy được bản mới (vd phần mềm diệt virus chặn) -> trả bản cũ về chỗ cũ.
+                await Task.Run(installed.Rollback);
+                throw;
             }
 
             Log.Info($"Đã cài bản {_release.Tag}, khởi động lại");
@@ -196,6 +216,16 @@ public sealed class UpdateViewModel : ObservableObject
             Fail(Loc.F("update.result.failed", ex.Message));
         }
     }
+
+    private static string ErrorText(string? code) => code switch
+    {
+        "rate_limit" => Loc.T("update.err.rate_limit"),
+        "timeout" => Loc.T("update.err.timeout"),
+        "network" => Loc.T("update.err.network"),
+        "invalid" => Loc.T("update.err.invalid"),
+        null or "" => Loc.T("update.err.network"),
+        var other => other,
+    };
 
     private void Fail(string message)
     {
