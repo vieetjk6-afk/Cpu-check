@@ -17,6 +17,7 @@ Phần mềm kiểm tra máy tính Windows: xem thông tin phần cứng, theo d
 | **Driver** | Thiết bị chưa cài driver, thiết bị báo lỗi (giải thích mã lỗi Device Manager), đang dùng driver chung (Basic Display, HD Audio), driver không chữ ký, driver quá cũ; tìm driver theo Hardware ID, mở Driver tùy chọn của Windows Update, trang driver NVIDIA/AMD/Intel và hãng máy (Dell, HP, Lenovo, ASUS, Acer, MSI, Gigabyte…) |
 | **Dọn dẹp** | **Tệp rác:** Temp, Windows Update cache, Delivery Optimization, báo cáo lỗi, log cũ, thumbnail, crash dump, shader cache, cache trình duyệt (Chrome, Edge, **Cốc Cốc**, Brave, Opera, Vivaldi, Firefox), Thùng rác. **Phần mềm:** ước lượng lần dùng cuối (UserAssist + Prefetch), đánh dấu phần mềm không dùng >90 ngày, phần mềm quảng cáo / "tối ưu hóa" giả / thanh công cụ / công cụ crack, app Store cài sẵn – gỡ bằng 1 nút. **Khởi động:** bật/tắt chương trình chạy cùng Windows |
 | **Lỗi & Khắc phục** | Màn hình xanh (kèm tên mã lỗi và nguyên nhân thường gặp), tắt máy đột ngột, lỗi phần cứng WHEA, lỗi ổ cứng/NTFS, driver card màn hình bị treo, ứng dụng hay crash, thiếu RAM, Windows hết hạn hỗ trợ, chờ khởi động lại, chưa cập nhật, chưa kích hoạt, diệt virus/tường lửa/UAC tắt… Mỗi vấn đề có gợi ý và nút khắc phục. **Công cụ sửa nhanh:** SFC + DISM, CHKDSK, kiểm tra RAM, tạo điểm khôi phục, xóa DNS, reset mạng, sửa Windows Update, quét phần cứng, sửa Microsoft Store, báo cáo pin… |
+| **Widget màn hình** | Bảng nhỏ nổi trên màn hình, **kéo thả tới bất kỳ đâu** (tự hít vào mép màn hình, nhớ vị trí, hỗ trợ nhiều màn hình). Tùy chọn thông số: CPU (% + xung), nhiệt độ CPU (+ công suất), GPU, nhiệt độ GPU (+ hot spot), VRAM, RAM, mạng (tải xuống/lên), ổ đĩa (% bận, đọc/ghi), nhiệt độ ổ, quạt, pin, thời gian chạy, đồng hồ. Tùy chỉnh: luôn ở trên cùng, khóa vị trí, độ đậm, kích thước nhỏ/vừa/lớn, bố cục dọc/ngang, biểu đồ, tần suất 1/2/5 giây, **khởi động cùng Windows**. Widget vẫn chạy khi đóng cửa sổ chính; nhấp đúp để mở lại, chuột phải để xem menu |
 | **Báo cáo** | Xuất toàn bộ kết quả ra 1 tệp HTML (gửi cho khách/kỹ thuật viên, in ấn) – `Ctrl+S` |
 
 ## Tải về và chạy
@@ -30,6 +31,8 @@ Phần mềm kiểm tra máy tính Windows: xem thông tin phần cứng, theo d
 3. **Nhiệt độ CPU:** cần driver [PawnIO](https://pawnio.eu/) (miễn phí, mã nguồn mở – thay thế WinRing0 đã bị Defender chặn). Nếu chưa cài, ứng dụng sẽ hiện nút cài đặt. Nhiệt độ GPU và ổ cứng đọc được mà không cần PawnIO.
 
 > Phím tắt: `F5` quét lại · `Ctrl+S` xuất báo cáo · `Esc` đóng hộp thoại.
+>
+> Widget: bật ở trang **Widget** hoặc nút ghim ở góc dưới thanh bên. "Khởi động cùng Windows" tạo một tác vụ trong Task Scheduler (`PC Check Widget`) chạy `PcCheck.exe --widget` khi đăng nhập – chỉ hiện widget, không hỏi UAC. Mở PC Check lần nữa khi đang chạy sẽ hiện lại cửa sổ chính thay vì mở bản thứ hai.
 
 ## An toàn
 
@@ -89,4 +92,4 @@ Thêm ngôn ngữ mới: tạo `Localization/Lang/<mã>.json` với cùng các k
 
 ## English
 
-**PC Check** is a Windows 10/11 PC diagnostics tool (C# / .NET 10 / WPF) with a modern dark/light, Vietnamese/English UI. It shows detailed hardware info, live temperatures and drive/battery health, checks component compatibility (RAM channel/speed/XMP, SSD vs HDD, display refresh rate, Windows 11 readiness), finds missing/failing/outdated drivers, cleans junk files, flags unused and unwanted software, manages startup apps, and diagnoses system errors (BSODs, unexpected shutdowns, WHEA, disk errors, GPU driver hangs…) with one-click fixes and an HTML report. Download the latest build from the **Actions** tab, or build with `dotnet build PcCheck.sln`.
+**PC Check** is a Windows 10/11 PC diagnostics tool (C# / .NET 10 / WPF) with a modern dark/light, Vietnamese/English UI. It shows detailed hardware info, live temperatures and drive/battery health, checks component compatibility (RAM channel/speed/XMP, SSD vs HDD, display refresh rate, Windows 11 readiness), finds missing/failing/outdated drivers, cleans junk files, flags unused and unwanted software, manages startup apps, offers a draggable, customizable always-on-top desktop widget (CPU/GPU/RAM/network/disk/temperatures), and diagnoses system errors (BSODs, unexpected shutdowns, WHEA, disk errors, GPU driver hangs…) with one-click fixes and an HTML report. Download the latest build from the **Actions** tab, or build with `dotnet build PcCheck.sln`.

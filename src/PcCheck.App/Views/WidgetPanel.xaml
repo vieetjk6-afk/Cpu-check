@@ -1,0 +1,122 @@
+<UserControl x:Class="PcCheck.App.Views.WidgetPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:PcCheck.App.Infrastructure"
+             xmlns:c="clr-namespace:PcCheck.App.Controls">
+    <!-- Nội dung widget (dùng chung cho cửa sổ widget và bản xem trước trong trang cài đặt). DataContext = WidgetViewModel -->
+    <UserControl.Resources>
+        <!-- Màu theo mức độ: bình thường = màu nhấn, cảnh báo = vàng, nghiêm trọng = đỏ -->
+        <Style x:Key="SeverityText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                    <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SeverityIcon" TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                    <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SeverityBar" TargetType="ProgressBar" BasedOn="{StaticResource {x:Type ProgressBar}}">
+            <Setter Property="Height" Value="4" />
+            <Setter Property="Maximum" Value="100" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                    <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <!-- Bố cục dọc -->
+        <ItemsControl ItemsSource="{Binding Metrics}" Focusable="False"
+                      Visibility="{Binding IsHorizontal, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Grid Width="236" Margin="0,5">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="20" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource SeverityIcon}" Text="{Binding Glyph}" FontSize="13" HorizontalAlignment="Left" />
+                        <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="12.5" Margin="6,0,8,0" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="2" Style="{StaticResource SeverityText}" Text="{Binding Value}" FontSize="15" FontWeight="SemiBold"
+                                   FontFamily="{StaticResource DisplayFont}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding Detail}" FontSize="11" Margin="6,0,0,0"
+                                   Foreground="{DynamicResource TextMutedBrush}" TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding Detail, Converter={StaticResource EmptyToCollapsed}}" />
+                        <ProgressBar Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="6,5,0,0" Style="{StaticResource SeverityBar}"
+                                     Value="{Binding Percent, Mode=OneWay}"
+                                     Visibility="{Binding HasBar, Converter={StaticResource BoolToVis}}" />
+                        <Grid Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Height="24" Margin="6,5,0,0">
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding HasGraph}" Value="True" />
+                                                <Condition Binding="{Binding DataContext.ShowGraphs, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+                            <c:Sparkline Values="{Binding History}" Capacity="40" Stroke="{DynamicResource AccentBrush}" />
+                        </Grid>
+                    </Grid>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Bố cục ngang (thanh mỏng) -->
+        <ItemsControl ItemsSource="{Binding Metrics}" Focusable="False"
+                      Visibility="{Binding IsHorizontal, Converter={StaticResource BoolToVis}}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal" Margin="0,2,18,2">
+                        <TextBlock Style="{StaticResource SeverityIcon}" Text="{Binding Glyph}" FontSize="14" VerticalAlignment="Center" />
+                        <StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource SeverityText}" Text="{Binding Value}" FontSize="14" FontWeight="SemiBold"
+                                       FontFamily="{StaticResource DisplayFont}" />
+                            <TextBlock Text="{Binding Label}" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" />
+                        </StackPanel>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <TextBlock Text="{l:T widget.empty}" Style="{StaticResource Caption}" Margin="0,6" MaxWidth="236" TextWrapping="Wrap" TextTrimming="None"
+                   Visibility="{Binding HasMetrics, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+    </StackPanel>
+</UserControl>

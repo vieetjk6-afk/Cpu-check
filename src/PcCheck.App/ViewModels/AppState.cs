@@ -16,6 +16,9 @@ public sealed class AppState : IDisposable
 
     public SystemMetrics Metrics { get; } = new();
 
+    /// <summary>Đang quét toàn bộ – các thao tác quét một phần phải chờ.</summary>
+    public bool IsScanning { get; set; }
+
     public ScanResult? Result { get; private set; }
 
     public SensorSnapshot Live { get; private set; } = SensorSnapshot.Empty;
@@ -41,12 +44,13 @@ public sealed class AppState : IDisposable
     /// <summary>Cập nhật một phần dữ liệu (vd quét lại driver, dọn rác) rồi phân tích lại mà không cần quét toàn bộ.</summary>
     public async Task ReanalyzeAsync(Func<ScanData, Task> mutate)
     {
-        if (Result is null) return;
-        var data = Result.Data;
-        var duration = Result.Duration;
+        if (Result is not { } original) return;
+        var data = original.Data;
         await mutate(data);
-        var result = await Task.Run(() => Analyzer.Analyze(data, DateTime.Now, duration));
-        SetResult(result);
+        var result = await Task.Run(() => Analyzer.Analyze(data, DateTime.Now, original.Duration));
+
+        // Một lần quét toàn bộ mới hơn đã hoàn tất trong lúc chờ -> không ghi đè bằng dữ liệu cũ.
+        if (ReferenceEquals(Result, original)) SetResult(result);
     }
 
     public async Task RefreshLiveAsync()

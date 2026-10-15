@@ -157,12 +157,12 @@ public sealed class CleanupViewModel : PageViewModel
 
     public CleanupViewModel(MainViewModel main) : base(main)
     {
-        ScanJunkCommand = new AsyncRelayCommand(ScanJunkAsync, () => !IsBusy);
-        CleanCommand = new AsyncRelayCommand(CleanAsync, () => !IsBusy && SelectedBytes > 0);
+        ScanJunkCommand = new AsyncRelayCommand(ScanJunkAsync, () => !IsBusy && !State.IsScanning);
+        CleanCommand = new AsyncRelayCommand(CleanAsync, () => !IsBusy && !State.IsScanning && SelectedBytes > 0);
         SelectAllCommand = new RelayCommand(() => SetAll(true));
         SelectNoneCommand = new RelayCommand(() => SetAll(false));
         UninstallCommand = new AsyncRelayCommand(p => UninstallAsync(p as ProgramItem), _ => !IsBusy);
-        RefreshSoftwareCommand = new AsyncRelayCommand(RefreshSoftwareAsync, () => !IsBusy && HasResult);
+        RefreshSoftwareCommand = new AsyncRelayCommand(RefreshSoftwareAsync, () => !IsBusy && !State.IsScanning && HasResult);
         OpenTaskManagerCommand = new RelayCommand(() => FixService.OpenUri("ms-settings:startupapps"));
         DiskCleanupCommand = new AsyncRelayCommand(() => Main.RunToolAsync(SystemTools.DiskCleanup, false));
     }

@@ -15,6 +15,7 @@ public sealed class SensorService : IDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     private Computer? _computer;
     private bool _openFailed;
+    private bool _disposed;
     private bool? _pawnIo;
 
     public SensorSnapshot Latest { get; private set; } = SensorSnapshot.Empty;
@@ -28,12 +29,21 @@ public sealed class SensorService : IDisposable
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (_computer is not null || _openFailed) return;
-            await Task.Run(Open, ct).ConfigureAwait(false);
+            if (_computer is not null || _openFailed || _disposed) return;
+            try
+            {
+                await Task.Run(Open, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Ví dụ: thiếu thư viện native của LibreHardwareMonitor -> lỗi ngay khi JIT, chỉ thử một lần.
+                _openFailed = true;
+                Log.Warn("Không tải được LibreHardwareMonitor", ex);
+            }
         }
         finally
         {
-            _gate.Release();
+            ReleaseGate();
         }
     }
 
@@ -88,12 +98,13 @@ public sealed class SensorService : IDisposable
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            if (_disposed || _computer is null) return Latest;
             Latest = await Task.Run(ReadAll, ct).ConfigureAwait(false);
             return Latest;
         }
         finally
         {
-            _gate.Release();
+            ReleaseGate();
         }
     }
 
@@ -175,7 +186,9 @@ public sealed class SensorService : IDisposable
         SensorType.Voltage => SensorKind.Voltage,
         SensorType.Power => SensorKind.Power,
         SensorType.Level => SensorKind.Level,
-        SensorType.Data or SensorType.SmallData => SensorKind.Data,
+        SensorType.Data => SensorKind.Data,
+        SensorType.SmallData => SensorKind.SmallData,
+        SensorType.Throughput => SensorKind.Throughput,
         _ => SensorKind.Other,
     };
 
@@ -190,8 +203,24 @@ public sealed class SensorService : IDisposable
         return temps.Count == 0 ? null : temps.Max();
     }
 
+    private void ReleaseGate()
+    {
+        try
+        {
+            _gate.Release();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
+
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
+
+        // Chờ lần đọc cảm biến đang chạy (nếu có) xong rồi mới đóng driver.
+        var entered = _gate.Wait(TimeSpan.FromSeconds(3));
         try
         {
             _computer?.Close();
@@ -200,8 +229,10 @@ public sealed class SensorService : IDisposable
         {
             Log.Warn("Đóng LibreHardwareMonitor lỗi", ex);
         }
-
-        _computer = null;
-        _gate.Dispose();
+        finally
+        {
+            _computer = null;
+            if (entered) ReleaseGate();
+        }
     }
 }

@@ -74,6 +74,11 @@ public sealed partial class LocalizationTests
 
         foreach (var code in DeviceErrorCodes.KnownCodes) Assert.True(Vi.ContainsKey($"devcode.{code}"), code.ToString(CultureInfo.InvariantCulture));
         foreach (var hint in BugChecks.AllHints) Assert.True(Vi.ContainsKey($"bugcheck.hint.{hint}"), hint);
+        foreach (var metric in Util.WidgetSettings.AllMetrics)
+        {
+            Assert.True(Vi.ContainsKey($"widget.metric.{metric}"), metric);
+            Assert.True(Vi.ContainsKey($"widget.metric_desc.{metric}"), metric);
+        }
     }
 
     [Fact]

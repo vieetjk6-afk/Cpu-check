@@ -34,7 +34,7 @@ public static class FixService
 
     public static FixOutcome OpenUri(string uri)
     {
-        if (uri.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        if (uri.StartsWith("http", StringComparison.OrdinalIgnoreCase) || File.Exists(uri))
         {
             // Mở qua explorer để trình duyệt chạy với quyền người dùng thường (không kế thừa quyền admin).
             Process.Start(new ProcessStartInfo("explorer.exe", $"\"{uri}\"") { UseShellExecute = true });
@@ -138,8 +138,7 @@ public static class FixService
                 var report = Path.Combine(Path.GetTempPath(), $"battery-report-{stamp}.html");
                 await RunHiddenAsync("powercfg.exe", $"/batteryreport /output \"{report}\"", ct).ConfigureAwait(false);
                 if (!File.Exists(report)) return new FixOutcome(false, L("fix.result.no_battery"));
-                Process.Start(new ProcessStartInfo(report) { UseShellExecute = true });
-                return new FixOutcome(true, L("fix.result.opened"));
+                return OpenUri(report);
 
             default:
                 return new FixOutcome(false, L("fix.result.unsupported"));

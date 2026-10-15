@@ -18,6 +18,7 @@
     <SolidColorBrush x:Key="InputBrush" Color="#F6F8FB" />
     <SolidColorBrush x:Key="TrackBrush" Color="#E6EAF1" />
     <SolidColorBrush x:Key="ScrollThumbBrush" Color="#C5CCD8" />
+    <SolidColorBrush x:Key="WidgetBackgroundBrush" Color="#F5FFFFFF" />
     <SolidColorBrush x:Key="OverlayBrush" Color="#80101828" />
     <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#3B6FF5" Offset="0" />

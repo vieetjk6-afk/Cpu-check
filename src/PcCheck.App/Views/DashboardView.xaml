@@ -112,7 +112,7 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Button Margin="0,0,12,12" Padding="16" HorizontalContentAlignment="Stretch"
-                                    Background="{DynamicResource CardBrush}"
+                                    Style="{StaticResource TileButton}"
                                     Command="{Binding DataContext.Main.NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                     CommandParameter="{Binding Page}">
                                 <Grid>

@@ -104,7 +104,7 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Button Margin="0,0,12,12" Padding="16,14" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Top"
-                                Background="{DynamicResource CardBrush}" Command="{Binding Command}" ToolTip="{Binding Description}">
+                                Style="{StaticResource TileButton}" Command="{Binding Command}" ToolTip="{Binding Description}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />

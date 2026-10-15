@@ -5,7 +5,6 @@
   "tooltip.language": "Đổi ngôn ngữ (Tiếng Việt / English)",
   "tooltip.theme": "Đổi giao diện sáng / tối",
   "error.unexpected": "Đã xảy ra lỗi: {0}",
-
   "nav.dashboard": "Tổng quan",
   "nav.hardware": "Phần cứng",
   "nav.health": "Nhiệt độ & Sức khỏe",
@@ -14,7 +13,6 @@
   "nav.cleanup": "Dọn dẹp",
   "nav.issues": "Lỗi & Khắc phục",
   "nav.settings": "Cài đặt",
-
   "page.dashboard.title": "Tổng quan",
   "page.hardware.title": "Thông tin phần cứng",
   "page.hardware.subtitle": "Chi tiết CPU, mainboard, RAM, card màn hình, ổ cứng, màn hình, mạng và pin.",
@@ -30,7 +28,6 @@
   "page.issues.subtitle": "Tất cả vấn đề phát hiện được, kèm gợi ý và nút khắc phục nhanh.",
   "page.settings.title": "Cài đặt",
   "page.settings.subtitle": "Ngôn ngữ, giao diện, chế độ quét và báo cáo.",
-
   "scan.button": "Quét toàn bộ",
   "scan.running": "Đang quét...",
   "scan.never": "Chưa quét lần nào. Nhấn \"Quét toàn bộ\" để bắt đầu.",
@@ -46,15 +43,12 @@
   "scan.step.system": "Bảo mật & hệ thống",
   "scan.step.junk": "Tệp rác",
   "scan.step.software": "Phần mềm",
-
   "empty.title": "Chưa có dữ liệu quét",
   "empty.desc": "Quét toàn bộ để kiểm tra phần cứng, nhiệt độ, driver, tệp rác và lỗi hệ thống. Thường chỉ mất 5–15 giây.",
-
   "dialog.ok": "Đồng ý",
   "dialog.cancel": "Hủy",
   "dialog.run": "Thực hiện",
   "dialog.confirm_generic": "Bạn có chắc muốn thực hiện thao tác này?",
-
   "common.yes": "Có",
   "common.no": "Không",
   "common.ok": "Bình thường",
@@ -64,12 +58,10 @@
   "common.select_all": "Chọn tất cả",
   "common.select_none": "Bỏ chọn",
   "common.disk_number": "Ổ đĩa {0}",
-
   "unit.days_hours": "{0} ngày {1} giờ",
   "unit.hours_minutes": "{0} giờ {1} phút",
   "unit.minutes": "{0} phút",
   "unit.hours": "{0:N0} giờ",
-
   "severity.critical": "Nghiêm trọng",
   "severity.warning": "Cảnh báo",
   "severity.info": "Lưu ý",
@@ -83,7 +75,6 @@
   "grade.good": "Tốt",
   "grade.fair": "Cần chú ý",
   "grade.poor": "Có vấn đề",
-
   "category.hardware": "Phần cứng",
   "category.temperature": "Nhiệt độ",
   "category.storage": "Ổ cứng",
@@ -93,7 +84,6 @@
   "category.software": "Phần mềm",
   "category.system": "Hệ thống",
   "category.security": "Bảo mật",
-
   "dash.health_score": "Điểm sức khỏe",
   "dash.not_scanned": "Chưa quét",
   "dash.headline.none": "Quét để biết tình trạng máy tính của bạn.",
@@ -122,7 +112,6 @@
   "dash.cat.issues": "{0} vấn đề cần xử lý",
   "dash.cat.notes": "{0} lưu ý nhỏ",
   "dash.cat.ok": "Ổn định",
-
   "hw.section.system": "Hệ thống",
   "hw.computer": "Máy tính",
   "hw.os": "Hệ điều hành",
@@ -169,7 +158,6 @@
   "hw.copy": "Sao chép thông tin",
   "hw.copied": "Đã sao chép thông tin phần cứng vào clipboard.",
   "hw.copy_failed": "Không sao chép được vào clipboard.",
-
   "ram.slot": "Khe",
   "ram.bank": "Bank",
   "ram.capacity": "Dung lượng",
@@ -177,12 +165,10 @@
   "ram.speed": "Tốc độ (đang chạy / hỗ trợ)",
   "ram.vendor": "Hãng",
   "ram.part": "Mã sản phẩm",
-
   "gpu.vram": "Bộ nhớ (VRAM)",
   "gpu.driver": "Phiên bản driver",
   "gpu.driver_date": "Ngày driver",
   "gpu.mode": "Chế độ hiển thị",
-
   "disk.model": "Model",
   "disk.type": "Loại",
   "disk.size": "Dung lượng",
@@ -204,25 +190,21 @@
   "disk.smart.fail": "Dự báo sắp hỏng!",
   "disk.errors": "Lỗi đọc/ghi không sửa được",
   "disk.no_errors": "Không có",
-
   "volume.drive": "Ổ",
   "volume.fs": "Định dạng",
   "volume.total": "Tổng",
   "volume.free": "Trống",
   "volume.usage": "Trống {0} / {1} · {2}",
-
   "monitor.primary": "Màn hình chính",
   "monitor.resolution": "Độ phân giải",
   "monitor.refresh": "Tần số quét",
   "monitor.max_refresh": "Tần số tối đa",
   "monitor.max_resolution": "Độ phân giải tối đa",
-
   "net.status": "Trạng thái",
   "net.connected": "Đã kết nối",
   "net.disconnected": "Chưa kết nối",
   "net.speed": "Tốc độ",
   "net.mac": "Địa chỉ MAC",
-
   "battery.charge": "Mức pin",
   "battery.charging": "đang sạc",
   "battery.design": "Dung lượng thiết kế",
@@ -231,7 +213,6 @@
   "battery.cycles": "Số lần sạc",
   "battery.summary": "Đang ở mức {0}",
   "battery.health": "Sức khỏe {0}",
-
   "health.cpu_temp": "Nhiệt độ CPU",
   "health.gpu_temp": "Nhiệt độ GPU",
   "health.disk_temp": "Nhiệt độ ổ cứng",
@@ -245,7 +226,6 @@
   "health.all_sensors_desc": "Cập nhật mỗi 2 giây. Giá trị thấp nhất / cao nhất tính từ lúc mở ứng dụng.",
   "health.loading_sensors": "Đang đọc cảm biến... Nếu không có dữ liệu, hãy chạy ứng dụng với quyền quản trị.",
   "health.sensors_unavailable": "Không khởi động được bộ đọc cảm biến. Hãy chạy lại với quyền quản trị; một số máy ảo / phần cứng đặc biệt không hỗ trợ đọc cảm biến.",
-
   "sensor.cpu_temp": "Nhiệt độ CPU",
   "sensor.cpu_load": "Tải CPU",
   "sensor.gpu_temp": "Nhiệt độ GPU",
@@ -263,13 +243,11 @@
   "sensor.kind.power": "công suất",
   "sensor.kind.level": "mức",
   "sensor.kind.other": "khác",
-
   "compat.group.memory": "Bộ nhớ RAM",
   "compat.group.win11": "Điều kiện Windows 11",
   "compat.group.system": "Hệ thống",
   "compat.group.display": "Màn hình",
   "compat.unknown": "Không xác định được (cần quyền quản trị).",
-
   "compat.ram_capacity.title": "Dung lượng RAM",
   "compat.ram_capacity.detail": "Máy có {0} RAM.",
   "compat.ram_capacity.rec": "Nên nâng cấp lên tối thiểu 8 GB (khuyến nghị 16 GB) để chạy Windows 11 và trình duyệt mượt mà.",
@@ -289,7 +267,6 @@
   "compat.ram_speed.rec_laptop": "Laptop thường bị giới hạn tốc độ RAM theo CPU/mainboard – đây là bình thường.",
   "compat.ram_upgrade.title": "Khả năng nâng cấp RAM",
   "compat.ram_upgrade.detail": "Mainboard hỗ trợ tối đa {0}, có {1} khe (còn trống {2}). Loại RAM: {3}.",
-
   "compat.win11_cpu.title": "CPU hỗ trợ Windows 11",
   "compat.win11_cpu.pass": "{0} nằm trong danh sách hỗ trợ (hoặc máy đang chạy Windows 11).",
   "compat.win11_cpu.fail": "{0} không nằm trong danh sách CPU hỗ trợ Windows 11 (cần Intel Core thế hệ 8+ hoặc AMD Ryzen 2000+).",
@@ -313,7 +290,6 @@
   "compat.win11_summary.ready": "Máy đáp ứng các yêu cầu chính để nâng cấp Windows 11.",
   "compat.win11_summary.blocked": "Máy chưa đáp ứng một số yêu cầu của Windows 11 (xem các mục Không đạt ở trên).",
   "compat.win11_summary.maybe": "Chưa xác định được đầy đủ. Hãy chạy với quyền quản trị hoặc dùng PC Health Check của Microsoft.",
-
   "compat.os_arch.title": "Windows 64-bit",
   "compat.os_arch.64bit": "Đang dùng Windows 64-bit.",
   "compat.os_arch.32bit": "Đang dùng Windows 32-bit – bị giới hạn RAM và nhiều phần mềm mới không hỗ trợ.",
@@ -345,7 +321,6 @@
   "compat.resolution.title": "Độ phân giải: {0}",
   "compat.resolution.low": "Đang dùng {0}×{1}, màn hình hỗ trợ tối đa {2}×{3}. Nên dùng độ phân giải gốc để chữ sắc nét (chỉnh tỉ lệ Scale nếu chữ nhỏ).",
   "compat.resolution.ok": "Đang dùng độ phân giải cao nhất {0}×{1}.",
-
   "drivers.missing": "Thiếu / chưa cài driver",
   "drivers.errors": "Thiết bị lỗi",
   "drivers.outdated": "Driver cũ",
@@ -371,7 +346,6 @@
   "driver.kind.outdated": "Driver cũ",
   "driver.kind.unsigned": "Không chữ ký",
   "driver.kind.disabled": "Đang tắt",
-
   "devcode.1": "Thiết bị chưa được cấu hình đúng",
   "devcode.3": "Driver bị hỏng hoặc hệ thống thiếu bộ nhớ",
   "devcode.10": "Thiết bị không thể khởi động",
@@ -395,15 +369,12 @@
   "devcode.48": "Driver bị chặn vì không tương thích với Windows",
   "devcode.52": "Windows không xác minh được chữ ký số của driver",
   "devcode.other": "Thiết bị báo lỗi (mã {0})",
-
   "vendor.nvidia": "Driver NVIDIA",
   "vendor.amd": "Driver AMD",
   "vendor.intel": "Intel Driver Assistant",
-
   "cleanup.tab_junk": "Tệp rác",
   "cleanup.tab_software": "Phần mềm",
   "cleanup.tab_startup": "Khởi động cùng Windows",
-
   "junk.user_temp.name": "Tệp tạm của người dùng",
   "junk.user_temp.desc": "Thư mục %TEMP% – tệp tạm do phần mềm tạo ra (chỉ xóa tệp cũ hơn 24 giờ).",
   "junk.windows_temp.name": "Tệp tạm của Windows",
@@ -438,7 +409,6 @@
   "junk.size": "Dung lượng",
   "junk.files": "Số tệp",
   "junk.disk_cleanup_hint": "Muốn xóa bản cập nhật Windows cũ, thư mục Windows.old hoặc gói cài đặt cũ an toàn? Dùng trình Disk Cleanup của Windows.",
-
   "software.filter_suggested": "Gợi ý gỡ",
   "software.filter_unused": "Ít dùng",
   "software.filter_bloat": "Không mong muốn",
@@ -459,7 +429,6 @@
   "software.publisher": "Nhà phát hành",
   "software.last_used": "Dùng lần cuối",
   "software.note": "Ghi chú",
-
   "bloat.reason.game": "Game quảng cáo cài sẵn",
   "bloat.reason.adware": "Phần mềm quảng cáo",
   "bloat.reason.optimizer": "\"Tối ưu/driver\" quảng cáo, không cần thiết",
@@ -469,7 +438,6 @@
   "bloat.reason.trial": "Bản dùng thử cài sẵn",
   "bloat.reason.crack": "Công cụ crack – nguy cơ mã độc",
   "bloat.reason.store": "App cài sẵn ít dùng",
-
   "startup.hint": "Tắt bớt chương trình khởi động cùng Windows giúp máy khởi động nhanh hơn. Tắt không phải là gỡ – bạn vẫn mở phần mềm bình thường được.",
   "startup.open_settings": "Mở cài đặt Startup",
   "startup.enabled": "Đã bật khởi động cùng Windows: {0}",
@@ -479,14 +447,12 @@
   "startup.loc.machine_run": "Registry (mọi người dùng)",
   "startup.loc.user_folder": "Thư mục Startup",
   "startup.loc.common_folder": "Thư mục Startup chung",
-
   "issues.filter_all": "Tất cả",
   "issues.none": "Không phát hiện vấn đề nào. Máy tính đang ở trạng thái tốt!",
   "issues.events_title": "Lỗi hệ thống trong {0} ngày qua",
   "issues.events_desc": "Tổng hợp từ Event Log của Windows: màn hình xanh, tắt máy đột ngột, lỗi phần cứng, lỗi ổ cứng, crash ứng dụng.",
   "issues.tools": "Công cụ sửa lỗi nhanh",
   "issues.tools_desc": "Các công cụ có sẵn của Windows, chạy bằng một cú nhấp. Lệnh nặng sẽ mở cửa sổ riêng để bạn theo dõi tiến trình.",
-
   "events.bsod": "Màn hình xanh (BSOD)",
   "events.power_loss": "Tắt máy đột ngột",
   "events.power_loss_hint": "Mất nguồn, treo cứng hoặc giữ nút nguồn để tắt.",
@@ -499,7 +465,6 @@
   "events.app_crash": "Ứng dụng bị crash / treo",
   "events.top_app": "Nhiều nhất: {0} ({1} lần)",
   "events.none": "Không có",
-
   "fix.go_cleanup": "Dọn tệp rác",
   "fix.go_software": "Xem phần mềm",
   "fix.go_startup": "Quản lý khởi động",
@@ -533,7 +498,6 @@
   "fix.result.no_battery": "Không tạo được báo cáo pin (máy không có pin?).",
   "fix.result.uninstalled": "Đã gỡ {0}.",
   "fix.result.uninstaller_started": "Đã mở trình gỡ cài đặt của {0}. Sau khi gỡ xong, nhấn \"Làm mới\".",
-
   "tool.sfc-dism.name": "Sửa file hệ thống",
   "tool.sfc-dism.desc": "DISM + SFC: quét và sửa file Windows bị hỏng (10–30 phút).",
   "tool.sfc-dism.confirm": "Mở cửa sổ lệnh chạy DISM /RestoreHealth rồi SFC /scannow để sửa file hệ thống bị hỏng. Quá trình mất 10–30 phút, không tắt máy khi đang chạy. Tiếp tục?",
@@ -574,14 +538,12 @@
   "tool.uac.desc": "Bật lại User Account Control.",
   "tool.performance.name": "Tùy chọn hiệu năng",
   "tool.performance.desc": "Hiệu ứng hình ảnh và bộ nhớ ảo (page file).",
-
   "bugcheck.hint.ram": "Lỗi này thường do RAM: chạy \"Kiểm tra RAM\", tháo lắp lại hoặc thử từng thanh RAM, tắt XMP/ép xung nếu có.",
   "bugcheck.hint.driver": "Lỗi này thường do driver: cập nhật driver (card màn hình, mạng, chipset), gỡ phần mềm/driver mới cài gần đây, chạy \"Sửa file hệ thống\".",
   "bugcheck.hint.gpu": "Lỗi liên quan card màn hình: cài lại driver GPU bản mới nhất, kiểm tra nhiệt độ GPU, bỏ ép xung.",
   "bugcheck.hint.disk": "Lỗi liên quan ổ cứng: sao lưu dữ liệu ngay, chạy CHKDSK, kiểm tra sức khỏe S.M.A.R.T và cáp/khe cắm ổ.",
   "bugcheck.hint.hardware": "Lỗi phần cứng (CPU/RAM/nguồn/mainboard): bỏ ép xung, kiểm tra nhiệt độ, nguồn (PSU) và cập nhật BIOS.",
   "bugcheck.hint.system": "Có thể do file hệ thống hỏng hoặc phần mềm xung đột: chạy \"Sửa file hệ thống\", cập nhật Windows và driver.",
-
   "issue.cpu_hot.title": "CPU quá nóng ({0}°C)",
   "issue.cpu_hot.detail": "Nhiệt độ CPU đang ở {0}°C (tải {1}%). Nhiệt độ cao kéo dài làm CPU tự giảm xung (chậm máy), treo hoặc tắt đột ngột.",
   "issue.cpu_hot.rec": "Vệ sinh bụi quạt và khe tản nhiệt, thay keo tản nhiệt (nếu trên 2 năm), kiểm tra quạt có quay không. Với laptop, kê cao đáy máy hoặc dùng đế tản nhiệt.",
@@ -620,7 +582,6 @@
   "issue.low_space.detail": "Ổ {0} chỉ còn trống {1} / {2} ({3}%).",
   "issue.low_space.rec_system": "Ổ hệ thống cần trống tối thiểu 15–20% để Windows cập nhật và chạy mượt. Dọn tệp rác, gỡ phần mềm ít dùng, chuyển dữ liệu sang ổ khác.",
   "issue.low_space.rec_data": "Dọn bớt dữ liệu hoặc chuyển sang ổ khác.",
-
   "issue.driver_missing.title": "Chưa cài driver: {0}",
   "issue.driver_error.title": "Thiết bị lỗi: {0}",
   "issue.driver_error.detail": "{0} (mã lỗi {1}). Mã phần cứng: {2}",
@@ -641,7 +602,6 @@
   "issue.driver_disabled.title": "{0} thiết bị đang bị tắt",
   "issue.driver_disabled.detail": "Thiết bị bị vô hiệu hóa: {0}.",
   "issue.driver_disabled.rec": "Nếu bạn không chủ động tắt, hãy bật lại trong Device Manager.",
-
   "issue.bsod.title": "Màn hình xanh {0} lần trong {1} ngày",
   "issue.bsod.detail": "Mã lỗi: {0} ({1}). Lần gần nhất: {2:g}.",
   "issue.bsod.detail_dump": "Phát hiện tệp minidump (lần gần nhất {0:g}) – máy đã gặp lỗi màn hình xanh.",
@@ -671,7 +631,6 @@
   "issue.app_crash.title": "{0} ứng dụng hay bị crash",
   "issue.app_crash.detail": "Ứng dụng crash/treo nhiều lần trong {1} ngày: {0}.",
   "issue.app_crash.rec": "Cập nhật hoặc cài lại các ứng dụng này. Nếu nhiều ứng dụng cùng lỗi, chạy \"Sửa file hệ thống\" và kiểm tra RAM.",
-
   "issue.not_admin.title": "Chưa chạy với quyền quản trị",
   "issue.not_admin.detail": "Một số kiểm tra (nhiệt độ CPU, TPM, S.M.A.R.T, Prefetch, dọn thư mục hệ thống) cần quyền quản trị.",
   "issue.win10_eos.title": "Windows 10 đã hết hỗ trợ",
@@ -702,7 +661,6 @@
   "issue.pagefile.detail": "Với {0} RAM, tắt page file dễ gây lỗi thiếu bộ nhớ, crash ứng dụng.",
   "issue.windows_old.title": "Còn bản Windows cũ (Windows.old)",
   "issue.windows_old.detail": "Thư mục Windows.old thường chiếm 10–30 GB. Nếu không cần quay lại bản cũ, có thể xóa bằng Disk Cleanup / Storage Sense.",
-
   "issue.junk.title": "Có {0} tệp rác có thể dọn",
   "issue.junk.detail": "Nhiều nhất: {0}.",
   "issue.junk.rec": "Dọn tệp rác giúp giải phóng dung lượng ổ cứng.",
@@ -716,7 +674,6 @@
   "issue.startup.title": "{0} chương trình khởi động cùng Windows",
   "issue.startup.detail": "Quá nhiều chương trình tự chạy khi bật máy làm khởi động chậm và tốn RAM.",
   "issue.startup.rec": "Tắt các chương trình không cần thiết (chat, cập nhật, launcher game...).",
-
   "report.title": "Báo cáo kiểm tra máy tính",
   "report.export": "Xuất báo cáo",
   "report.save_title": "Lưu báo cáo",
@@ -735,7 +692,6 @@
   "report.col.issue": "Vấn đề",
   "report.col.recommendation": "Gợi ý khắc phục",
   "report.footer": "Tạo bởi PC Check · thời gian quét {0:0.0} giây",
-
   "settings.appearance": "Giao diện",
   "settings.language": "Ngôn ngữ",
   "settings.language_desc": "Ngôn ngữ hiển thị của ứng dụng và báo cáo.",
@@ -757,5 +713,80 @@
   "settings.admin_no": "Không có quyền quản trị – một số kiểm tra bị giới hạn.",
   "settings.data_folder": "Thư mục cài đặt:",
   "settings.shortcuts": "Phím tắt: F5 – quét lại · Ctrl+S – xuất báo cáo · Esc – đóng hộp thoại.",
-  "settings.credits": "Đọc cảm biến bằng LibreHardwareMonitor (MPL-2.0). Thông tin hệ thống qua WMI và Windows API."
+  "settings.credits": "Đọc cảm biến bằng LibreHardwareMonitor (MPL-2.0). Thông tin hệ thống qua WMI và Windows API.",
+  "nav.widget": "Widget",
+  "tooltip.widget": "Bật / tắt widget trên màn hình",
+  "page.widget.title": "Widget màn hình",
+  "page.widget.subtitle": "Bảng nhỏ nổi trên màn hình hiển thị nhiệt độ, CPU, RAM, GPU, mạng, ổ đĩa theo thời gian thực. Kéo thả để di chuyển tới bất kỳ đâu.",
+  "widget.show": "Hiện widget",
+  "widget.hide": "Ẩn widget",
+  "widget.behavior": "Hoạt động",
+  "widget.visible": "Hiện widget",
+  "widget.visible_desc": "Widget vẫn chạy khi bạn đóng cửa sổ PC Check. Nhấp đúp vào widget để mở lại ứng dụng.",
+  "widget.topmost": "Luôn ở trên cùng",
+  "widget.topmost_desc": "Widget nằm trên mọi cửa sổ khác.",
+  "widget.locked": "Khóa vị trí",
+  "widget.locked_desc": "Không cho kéo widget, tránh lỡ tay di chuyển.",
+  "widget.graphs": "Hiện biểu đồ",
+  "widget.graphs_desc": "Biểu đồ nhỏ theo thời gian cho CPU, GPU, RAM, mạng, ổ đĩa.",
+  "widget.autostart": "Khởi động cùng Windows",
+  "widget.autostart_desc": "Tự mở widget khi đăng nhập Windows (không hiện cửa sổ chính, không hỏi UAC).",
+  "widget.autostart_on": "Đã bật: widget sẽ tự mở khi đăng nhập Windows.",
+  "widget.autostart_off": "Đã tắt khởi động widget cùng Windows.",
+  "widget.autostart_failed": "Không thay đổi được tác vụ khởi động (Task Scheduler).",
+  "widget.appearance": "Giao diện",
+  "widget.opacity": "Độ đậm",
+  "widget.size": "Kích thước",
+  "widget.size_small": "Nhỏ",
+  "widget.size_medium": "Vừa",
+  "widget.size_large": "Lớn",
+  "widget.layout": "Bố cục",
+  "widget.layout_vertical": "Dọc",
+  "widget.layout_horizontal": "Ngang",
+  "widget.interval": "Tần suất cập nhật",
+  "widget.interval_1": "1 giây",
+  "widget.interval_2": "2 giây",
+  "widget.interval_5": "5 giây",
+  "widget.reset_position": "Đưa về góc trên bên phải",
+  "widget.metrics": "Thông số hiển thị",
+  "widget.metrics_desc": "Chọn những thông số muốn xem trên widget. Thứ tự hiển thị theo danh sách này.",
+  "widget.reset_metrics": "Mặc định",
+  "widget.preview": "Xem trước",
+  "widget.tip": "Kéo widget để di chuyển (tự hít vào mép màn hình), nhấp đúp để mở PC Check, nhấp chuột phải để xem thêm tùy chọn.",
+  "widget.empty": "Chưa chọn thông số nào. Vào trang Widget để chọn.",
+  "widget.no_sensor": "Chưa có cảm biến",
+  "widget.no_battery": "Không có pin",
+  "widget.hotspot": "Hot spot {0}°C",
+  "widget.menu.open": "Mở PC Check",
+  "widget.menu.settings": "Tùy chỉnh widget...",
+  "widget.menu.horizontal": "Bố cục ngang",
+  "widget.menu.hide": "Ẩn widget",
+  "widget.menu.exit": "Thoát PC Check",
+  "widget.metric.cpu": "CPU",
+  "widget.metric.cpu_temp": "Nhiệt độ CPU",
+  "widget.metric.gpu": "GPU",
+  "widget.metric.gpu_temp": "Nhiệt độ GPU",
+  "widget.metric.vram": "VRAM",
+  "widget.metric.ram": "RAM",
+  "widget.metric.net": "Mạng",
+  "widget.metric.disk": "Ổ đĩa",
+  "widget.metric.disk_temp": "Nhiệt độ ổ đĩa",
+  "widget.metric.fans": "Quạt",
+  "widget.metric.battery": "Pin",
+  "widget.metric.uptime": "Thời gian chạy",
+  "widget.metric.clock": "Đồng hồ",
+  "widget.metric_desc.cpu": "% tải và xung nhịp",
+  "widget.metric_desc.cpu_temp": "Nhiệt độ và công suất CPU",
+  "widget.metric_desc.gpu": "% tải card màn hình",
+  "widget.metric_desc.gpu_temp": "Nhiệt độ GPU và hot spot",
+  "widget.metric_desc.vram": "Bộ nhớ card màn hình đã dùng",
+  "widget.metric_desc.ram": "% RAM và dung lượng đang dùng",
+  "widget.metric_desc.net": "Tốc độ tải xuống / tải lên",
+  "widget.metric_desc.disk": "% bận, tốc độ đọc / ghi",
+  "widget.metric_desc.disk_temp": "Ổ nóng nhất",
+  "widget.metric_desc.fans": "Tốc độ quạt cao nhất",
+  "widget.metric_desc.battery": "Mức pin (laptop)",
+  "widget.metric_desc.uptime": "Thời gian từ lần khởi động",
+  "widget.metric_desc.clock": "Giờ và ngày",
+  "sensor.kind.throughput": "tốc độ"
 }

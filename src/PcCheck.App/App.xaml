@@ -5,7 +5,7 @@
              xmlns:vm="clr-namespace:PcCheck.App.ViewModels"
              xmlns:views="clr-namespace:PcCheck.App.Views"
              xmlns:c="clr-namespace:PcCheck.App.Controls"
-             ShutdownMode="OnMainWindowClose">
+             ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -158,6 +158,7 @@
             <DataTemplate DataType="{x:Type vm:CleanupViewModel}"><views:CleanupView /></DataTemplate>
             <DataTemplate DataType="{x:Type vm:IssuesViewModel}"><views:IssuesView /></DataTemplate>
             <DataTemplate DataType="{x:Type vm:SettingsViewModel}"><views:SettingsView /></DataTemplate>
+            <DataTemplate DataType="{x:Type vm:WidgetViewModel}"><views:WidgetView /></DataTemplate>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

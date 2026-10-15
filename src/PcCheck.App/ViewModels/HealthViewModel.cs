@@ -149,7 +149,7 @@ public sealed class HealthViewModel : PageViewModel
 
         foreach (var reading in live.Readings)
         {
-            if (reading.Kind is SensorKind.Data or SensorKind.Other) continue;
+            if (reading.Kind is SensorKind.Data or SensorKind.SmallData or SensorKind.Other) continue;
             if (!_rows.TryGetValue(reading.Id, out var row))
             {
                 var groupKey = reading.Hardware;
@@ -214,6 +214,7 @@ public sealed class HealthViewModel : PageViewModel
         SensorKind.Voltage => "sensor.kind.voltage",
         SensorKind.Power => "sensor.kind.power",
         SensorKind.Level => "sensor.kind.level",
+        SensorKind.Throughput => "sensor.kind.throughput",
         _ => "sensor.kind.other",
     });
 
@@ -229,6 +230,7 @@ public sealed class HealthViewModel : PageViewModel
             SensorKind.Fan => v.ToString("0", c) + " RPM",
             SensorKind.Voltage => v.ToString("0.000", c) + " V",
             SensorKind.Power => v.ToString("0.0", c) + " W",
+            SensorKind.Throughput => Format.Speed(v, c),
             _ => v.ToString("0.##", c),
         };
     }

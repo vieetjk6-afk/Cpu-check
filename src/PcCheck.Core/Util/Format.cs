@@ -23,6 +23,10 @@ public static class Format
         return value.ToString(format, culture) + " " + Units[unit];
     }
 
+    /// <summary>Tốc độ truyền: 1.2 MB/s, 350 KB/s.</summary>
+    public static string Speed(double? bytesPerSecond, CultureInfo? culture = null) =>
+        bytesPerSecond is null ? "—" : Bytes((long)bytesPerSecond.Value, culture) + "/s";
+
     public static string Bytes(ulong bytes, CultureInfo? culture = null) =>
         Bytes(bytes > long.MaxValue ? long.MaxValue : (long)bytes, culture);
 

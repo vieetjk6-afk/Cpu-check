@@ -13,6 +13,17 @@ public partial class MainWindow : Window
         SourceInitialized += (_, _) => ThemeManager.ApplyTitleBar(this);
         StateChanged += (_, _) => (DataContext as MainViewModel)?.SetActive(WindowState != WindowState.Minimized);
         PreviewKeyDown += OnPreviewKeyDown;
+        Closing += OnClosing;
+        Closed += (_, _) => App.Current.ExitApplication();
+    }
+
+    /// <summary>Đóng cửa sổ chính khi widget đang hiện -> chỉ ẩn đi để widget tiếp tục chạy.</summary>
+    private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (App.Current.IsExiting || DataContext is not MainViewModel vm || !vm.Widget.IsVisible) return;
+        e.Cancel = true;
+        Hide();
+        vm.SetActive(false);
     }
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)

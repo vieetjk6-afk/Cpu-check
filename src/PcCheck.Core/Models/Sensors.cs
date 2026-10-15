@@ -21,7 +21,15 @@ public enum SensorKind
     Voltage,
     Power,
     Level,
+
+    /// <summary>Dung lượng lớn (GB), vd RAM đã dùng.</summary>
     Data,
+
+    /// <summary>Dung lượng nhỏ (MB), vd VRAM đã dùng.</summary>
+    SmallData,
+
+    /// <summary>Tốc độ truyền (byte/giây), vd tốc độ đọc/ghi ổ đĩa.</summary>
+    Throughput,
     Other,
 }
 
@@ -52,6 +60,51 @@ public sealed class SensorSnapshot
     public float? GpuTemperature => Pick(Readings, SensorHardwareKind.Gpu, SensorKind.Temperature, "GPU Core", "GPU Hot Spot", "Core");
     public float? GpuLoad => Pick(Readings, SensorHardwareKind.Gpu, SensorKind.Load, "GPU Core", "D3D 3D", "Core");
     public float? MemoryLoad => Pick(Readings, SensorHardwareKind.Memory, SensorKind.Load, "Memory");
+
+    public float? GpuHotSpot => Pick(Readings, SensorHardwareKind.Gpu, SensorKind.Temperature, "GPU Hot Spot");
+
+    /// <summary>Xung nhịp cao nhất trong các nhân CPU (MHz).</summary>
+    public float? CpuClock =>
+        Readings.Where(r => r.HardwareKind == SensorHardwareKind.Cpu && r.Kind == SensorKind.Clock && r.Value > 0
+                            && !r.Name.Contains("Bus", StringComparison.OrdinalIgnoreCase))
+            .Select(r => r.Value)
+            .DefaultIfEmpty(null)
+            .Max();
+
+    public float? CpuPower => Pick(Readings, SensorHardwareKind.Cpu, SensorKind.Power, "CPU Package", "Package");
+
+    public float? GpuPower => Pick(Readings, SensorHardwareKind.Gpu, SensorKind.Power, "GPU Package", "GPU Power", "GPU Core");
+
+    /// <summary>VRAM đã dùng / tổng (MB).</summary>
+    public float? GpuMemoryUsed => Pick(Readings, SensorHardwareKind.Gpu, SensorKind.SmallData, "GPU Memory Used", "D3D Dedicated Memory Used");
+
+    public float? GpuMemoryTotal => Pick(Readings, SensorHardwareKind.Gpu, SensorKind.SmallData, "GPU Memory Total", "D3D Dedicated Memory Total");
+
+    /// <summary>% thời gian ổ đĩa bận (ổ bận nhất).</summary>
+    public float? DiskActivity =>
+        Readings.Where(r => r.HardwareKind == SensorHardwareKind.Storage && r.Kind == SensorKind.Load
+                            && r.Name.Contains("Activity", StringComparison.OrdinalIgnoreCase) && r.Value is not null)
+            .Select(r => r.Value)
+            .DefaultIfEmpty(null)
+            .Max();
+
+    public float? DiskReadRate => SumThroughput("Read");
+
+    public float? DiskWriteRate => SumThroughput("Write");
+
+    public float? MaxFanRpm =>
+        Readings.Where(r => r.Kind == SensorKind.Fan && r.Value > 0).Select(r => r.Value).DefaultIfEmpty(null).Max();
+
+    public int FanCount => Readings.Count(r => r.Kind == SensorKind.Fan && r.Value > 0);
+
+    public float? BatteryLevel => Pick(Readings, SensorHardwareKind.Battery, SensorKind.Level, "Charge Level");
+
+    private float? SumThroughput(string name)
+    {
+        var list = Readings.Where(r => r.HardwareKind == SensorHardwareKind.Storage && r.Kind == SensorKind.Throughput
+                                       && r.Name.Contains(name, StringComparison.OrdinalIgnoreCase) && r.Value is not null).ToList();
+        return list.Count == 0 ? null : list.Sum(r => r.Value!.Value);
+    }
 
     public float? MaxStorageTemperature =>
         Readings.Where(r => r.HardwareKind == SensorHardwareKind.Storage && r.Kind == SensorKind.Temperature && r.Value is > 0 and < 150)

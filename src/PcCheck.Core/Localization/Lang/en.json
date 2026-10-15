@@ -5,7 +5,6 @@
   "tooltip.language": "Switch language (Tiếng Việt / English)",
   "tooltip.theme": "Switch light / dark theme",
   "error.unexpected": "Something went wrong: {0}",
-
   "nav.dashboard": "Overview",
   "nav.hardware": "Hardware",
   "nav.health": "Temperature & Health",
@@ -14,7 +13,6 @@
   "nav.cleanup": "Cleanup",
   "nav.issues": "Issues & Fixes",
   "nav.settings": "Settings",
-
   "page.dashboard.title": "Overview",
   "page.hardware.title": "Hardware information",
   "page.hardware.subtitle": "Details of CPU, motherboard, RAM, graphics, storage, displays, network and battery.",
@@ -30,7 +28,6 @@
   "page.issues.subtitle": "Everything that was detected, with recommendations and quick-fix buttons.",
   "page.settings.title": "Settings",
   "page.settings.subtitle": "Language, theme, scanning and reports.",
-
   "scan.button": "Full scan",
   "scan.running": "Scanning...",
   "scan.never": "No scan yet. Press \"Full scan\" to start.",
@@ -46,15 +43,12 @@
   "scan.step.system": "Security & system",
   "scan.step.junk": "Junk files",
   "scan.step.software": "Software",
-
   "empty.title": "No scan data yet",
   "empty.desc": "Run a full scan to check hardware, temperatures, drivers, junk files and system errors. It usually takes 5–15 seconds.",
-
   "dialog.ok": "OK",
   "dialog.cancel": "Cancel",
   "dialog.run": "Run",
   "dialog.confirm_generic": "Are you sure you want to do this?",
-
   "common.yes": "Yes",
   "common.no": "No",
   "common.ok": "Normal",
@@ -64,12 +58,10 @@
   "common.select_all": "Select all",
   "common.select_none": "Select none",
   "common.disk_number": "Disk {0}",
-
   "unit.days_hours": "{0} days {1} hours",
   "unit.hours_minutes": "{0} h {1} min",
   "unit.minutes": "{0} min",
   "unit.hours": "{0:N0} hours",
-
   "severity.critical": "Critical",
   "severity.warning": "Warning",
   "severity.info": "Note",
@@ -83,7 +75,6 @@
   "grade.good": "Good",
   "grade.fair": "Needs attention",
   "grade.poor": "Problems found",
-
   "category.hardware": "Hardware",
   "category.temperature": "Temperature",
   "category.storage": "Storage",
@@ -93,7 +84,6 @@
   "category.software": "Software",
   "category.system": "System",
   "category.security": "Security",
-
   "dash.health_score": "Health score",
   "dash.not_scanned": "Not scanned",
   "dash.headline.none": "Run a scan to see how your PC is doing.",
@@ -122,7 +112,6 @@
   "dash.cat.issues": "{0} issues to fix",
   "dash.cat.notes": "{0} minor notes",
   "dash.cat.ok": "All good",
-
   "hw.section.system": "System",
   "hw.computer": "Computer",
   "hw.os": "Operating system",
@@ -169,7 +158,6 @@
   "hw.copy": "Copy info",
   "hw.copied": "Hardware information copied to the clipboard.",
   "hw.copy_failed": "Could not copy to the clipboard.",
-
   "ram.slot": "Slot",
   "ram.bank": "Bank",
   "ram.capacity": "Capacity",
@@ -177,12 +165,10 @@
   "ram.speed": "Speed (running / rated)",
   "ram.vendor": "Vendor",
   "ram.part": "Part number",
-
   "gpu.vram": "Memory (VRAM)",
   "gpu.driver": "Driver version",
   "gpu.driver_date": "Driver date",
   "gpu.mode": "Display mode",
-
   "disk.model": "Model",
   "disk.type": "Type",
   "disk.size": "Capacity",
@@ -204,25 +190,21 @@
   "disk.smart.fail": "Failure predicted!",
   "disk.errors": "Uncorrected read/write errors",
   "disk.no_errors": "None",
-
   "volume.drive": "Drive",
   "volume.fs": "File system",
   "volume.total": "Total",
   "volume.free": "Free",
   "volume.usage": "{0} free of {1} · {2}",
-
   "monitor.primary": "Primary display",
   "monitor.resolution": "Resolution",
   "monitor.refresh": "Refresh rate",
   "monitor.max_refresh": "Max refresh rate",
   "monitor.max_resolution": "Max resolution",
-
   "net.status": "Status",
   "net.connected": "Connected",
   "net.disconnected": "Disconnected",
   "net.speed": "Speed",
   "net.mac": "MAC address",
-
   "battery.charge": "Charge",
   "battery.charging": "charging",
   "battery.design": "Design capacity",
@@ -231,7 +213,6 @@
   "battery.cycles": "Cycle count",
   "battery.summary": "Currently at {0}",
   "battery.health": "Health {0}",
-
   "health.cpu_temp": "CPU temperature",
   "health.gpu_temp": "GPU temperature",
   "health.disk_temp": "Drive temperature",
@@ -245,7 +226,6 @@
   "health.all_sensors_desc": "Updated every 2 seconds. Min / max are measured since the app started.",
   "health.loading_sensors": "Reading sensors... If nothing shows up, run the app as administrator.",
   "health.sensors_unavailable": "Could not start the sensor reader. Run the app as administrator; some virtual machines or special hardware do not expose sensors.",
-
   "sensor.cpu_temp": "CPU temperature",
   "sensor.cpu_load": "CPU load",
   "sensor.gpu_temp": "GPU temperature",
@@ -263,13 +243,11 @@
   "sensor.kind.power": "power",
   "sensor.kind.level": "level",
   "sensor.kind.other": "other",
-
   "compat.group.memory": "Memory (RAM)",
   "compat.group.win11": "Windows 11 requirements",
   "compat.group.system": "System",
   "compat.group.display": "Displays",
   "compat.unknown": "Could not be determined (administrator rights needed).",
-
   "compat.ram_capacity.title": "RAM capacity",
   "compat.ram_capacity.detail": "This PC has {0} of RAM.",
   "compat.ram_capacity.rec": "Upgrade to at least 8 GB (16 GB recommended) for smooth Windows 11 and web browsing.",
@@ -289,7 +267,6 @@
   "compat.ram_speed.rec_laptop": "Laptops are usually limited by the CPU/motherboard – this is normal.",
   "compat.ram_upgrade.title": "RAM upgrade options",
   "compat.ram_upgrade.detail": "Motherboard supports up to {0} in {1} slots ({2} free). RAM type: {3}.",
-
   "compat.win11_cpu.title": "Windows 11 supported CPU",
   "compat.win11_cpu.pass": "{0} is on the supported list (or the PC already runs Windows 11).",
   "compat.win11_cpu.fail": "{0} is not on the Windows 11 supported CPU list (needs Intel Core 8th gen+ or AMD Ryzen 2000+).",
@@ -313,7 +290,6 @@
   "compat.win11_summary.ready": "This PC meets the main Windows 11 requirements.",
   "compat.win11_summary.blocked": "This PC does not meet some Windows 11 requirements (see the failed items above).",
   "compat.win11_summary.maybe": "Could not fully determine. Run as administrator or use Microsoft's PC Health Check.",
-
   "compat.os_arch.title": "64-bit Windows",
   "compat.os_arch.64bit": "Running 64-bit Windows.",
   "compat.os_arch.32bit": "Running 32-bit Windows – RAM is limited and many new apps are unsupported.",
@@ -345,7 +321,6 @@
   "compat.resolution.title": "Resolution: {0}",
   "compat.resolution.low": "Using {0}×{1}, the display supports up to {2}×{3}. Use the native resolution for sharp text (adjust Scale if text is too small).",
   "compat.resolution.ok": "Using the highest resolution {0}×{1}.",
-
   "drivers.missing": "Missing drivers",
   "drivers.errors": "Devices with errors",
   "drivers.outdated": "Outdated drivers",
@@ -371,7 +346,6 @@
   "driver.kind.outdated": "Outdated",
   "driver.kind.unsigned": "Unsigned",
   "driver.kind.disabled": "Disabled",
-
   "devcode.1": "The device is not configured correctly",
   "devcode.3": "The driver is corrupted or the system is low on memory",
   "devcode.10": "The device cannot start",
@@ -395,15 +369,12 @@
   "devcode.48": "The driver is blocked because it is incompatible with Windows",
   "devcode.52": "Windows cannot verify the driver's digital signature",
   "devcode.other": "The device reports an error (code {0})",
-
   "vendor.nvidia": "NVIDIA drivers",
   "vendor.amd": "AMD drivers",
   "vendor.intel": "Intel Driver Assistant",
-
   "cleanup.tab_junk": "Junk files",
   "cleanup.tab_software": "Software",
   "cleanup.tab_startup": "Startup programs",
-
   "junk.user_temp.name": "User temporary files",
   "junk.user_temp.desc": "%TEMP% folder – temporary files created by apps (only files older than 24 hours).",
   "junk.windows_temp.name": "Windows temporary files",
@@ -438,7 +409,6 @@
   "junk.size": "Size",
   "junk.files": "Files",
   "junk.disk_cleanup_hint": "Want to safely remove old Windows updates, the Windows.old folder or old installers? Use Windows' Disk Cleanup.",
-
   "software.filter_suggested": "Suggested",
   "software.filter_unused": "Rarely used",
   "software.filter_bloat": "Unwanted",
@@ -459,7 +429,6 @@
   "software.publisher": "Publisher",
   "software.last_used": "Last used",
   "software.note": "Note",
-
   "bloat.reason.game": "Preinstalled ad game",
   "bloat.reason.adware": "Adware",
   "bloat.reason.optimizer": "Advertised \"optimizer/driver\" tool, not needed",
@@ -469,7 +438,6 @@
   "bloat.reason.trial": "Preinstalled trial",
   "bloat.reason.crack": "Crack tool – malware risk",
   "bloat.reason.store": "Rarely used preinstalled app",
-
   "startup.hint": "Disabling startup programs makes Windows boot faster. Disabling is not uninstalling – you can still open the app normally.",
   "startup.open_settings": "Open Startup settings",
   "startup.enabled": "Enabled at startup: {0}",
@@ -479,14 +447,12 @@
   "startup.loc.machine_run": "Registry (all users)",
   "startup.loc.user_folder": "Startup folder",
   "startup.loc.common_folder": "Common Startup folder",
-
   "issues.filter_all": "All",
   "issues.none": "No issues found. Your PC is in good shape!",
   "issues.events_title": "System errors in the last {0} days",
   "issues.events_desc": "Collected from the Windows Event Log: blue screens, unexpected shutdowns, hardware errors, disk errors, app crashes.",
   "issues.tools": "Quick repair tools",
   "issues.tools_desc": "Built-in Windows tools, one click away. Heavy commands open in their own window so you can follow progress.",
-
   "events.bsod": "Blue screens (BSOD)",
   "events.power_loss": "Unexpected shutdowns",
   "events.power_loss_hint": "Power loss, hard freeze or holding the power button.",
@@ -499,7 +465,6 @@
   "events.app_crash": "App crashes / hangs",
   "events.top_app": "Most frequent: {0} ({1}×)",
   "events.none": "None",
-
   "fix.go_cleanup": "Clean junk files",
   "fix.go_software": "Review software",
   "fix.go_startup": "Manage startup",
@@ -533,7 +498,6 @@
   "fix.result.no_battery": "Could not create a battery report (no battery?).",
   "fix.result.uninstalled": "{0} was removed.",
   "fix.result.uninstaller_started": "Opened the uninstaller for {0}. Press \"Refresh\" when it is done.",
-
   "tool.sfc-dism.name": "Repair system files",
   "tool.sfc-dism.desc": "DISM + SFC: scan and repair corrupted Windows files (10–30 min).",
   "tool.sfc-dism.confirm": "Open a command window that runs DISM /RestoreHealth and then SFC /scannow to repair corrupted system files. It takes 10–30 minutes; do not turn off the PC meanwhile. Continue?",
@@ -574,14 +538,12 @@
   "tool.uac.desc": "Turn User Account Control back on.",
   "tool.performance.name": "Performance options",
   "tool.performance.desc": "Visual effects and virtual memory (page file).",
-
   "bugcheck.hint.ram": "This error is usually caused by RAM: run \"Test RAM\", reseat or test one stick at a time, disable XMP/overclocking.",
   "bugcheck.hint.driver": "This error is usually caused by a driver: update drivers (graphics, network, chipset), remove recently installed software/drivers, run \"Repair system files\".",
   "bugcheck.hint.gpu": "Graphics-related error: reinstall the latest GPU driver, check GPU temperature, remove GPU overclocks.",
   "bugcheck.hint.disk": "Storage-related error: back up your data now, run CHKDSK, check S.M.A.R.T health and the drive cable/slot.",
   "bugcheck.hint.hardware": "Hardware error (CPU/RAM/PSU/motherboard): remove overclocks, check temperatures and the power supply, update the BIOS.",
   "bugcheck.hint.system": "Possibly corrupted system files or conflicting software: run \"Repair system files\", update Windows and drivers.",
-
   "issue.cpu_hot.title": "CPU is overheating ({0}°C)",
   "issue.cpu_hot.detail": "CPU temperature is {0}°C (load {1}%). Sustained heat makes the CPU throttle (slow down), freeze or shut down.",
   "issue.cpu_hot.rec": "Clean dust from fans and vents, replace thermal paste (if older than 2 years), make sure fans spin. On laptops, raise the back or use a cooling pad.",
@@ -620,7 +582,6 @@
   "issue.low_space.detail": "Drive {0} has only {1} free of {2} ({3}%).",
   "issue.low_space.rec_system": "The system drive needs at least 15–20% free space for updates and smooth operation. Clean junk, uninstall unused apps, move data to another drive.",
   "issue.low_space.rec_data": "Remove some data or move it to another drive.",
-
   "issue.driver_missing.title": "Driver not installed: {0}",
   "issue.driver_error.title": "Device error: {0}",
   "issue.driver_error.detail": "{0} (error code {1}). Hardware ID: {2}",
@@ -641,7 +602,6 @@
   "issue.driver_disabled.title": "{0} devices are disabled",
   "issue.driver_disabled.detail": "Disabled devices: {0}.",
   "issue.driver_disabled.rec": "If you did not disable them on purpose, re-enable them in Device Manager.",
-
   "issue.bsod.title": "{0} blue screens in {1} days",
   "issue.bsod.detail": "Stop code: {0} ({1}). Last one: {2:g}.",
   "issue.bsod.detail_dump": "Minidump files found (latest {0:g}) – the PC has had blue screen crashes.",
@@ -671,7 +631,6 @@
   "issue.app_crash.title": "{0} apps crash frequently",
   "issue.app_crash.detail": "Apps that crashed/hung repeatedly in {1} days: {0}.",
   "issue.app_crash.rec": "Update or reinstall these apps. If many apps crash, run \"Repair system files\" and test RAM.",
-
   "issue.not_admin.title": "Not running as administrator",
   "issue.not_admin.detail": "Some checks (CPU temperature, TPM, S.M.A.R.T, Prefetch, system folder cleanup) need administrator rights.",
   "issue.win10_eos.title": "Windows 10 is out of support",
@@ -702,7 +661,6 @@
   "issue.pagefile.detail": "With {0} of RAM, disabling the page file easily leads to out-of-memory errors and crashes.",
   "issue.windows_old.title": "Previous Windows installation found (Windows.old)",
   "issue.windows_old.detail": "Windows.old usually takes 10–30 GB. If you do not need to roll back, remove it with Disk Cleanup / Storage Sense.",
-
   "issue.junk.title": "{0} of junk files can be cleaned",
   "issue.junk.detail": "Largest: {0}.",
   "issue.junk.rec": "Cleaning junk files frees up disk space.",
@@ -716,7 +674,6 @@
   "issue.startup.title": "{0} programs start with Windows",
   "issue.startup.detail": "Too many programs launching at boot slow down startup and use RAM.",
   "issue.startup.rec": "Disable the ones you do not need (chat apps, updaters, game launchers...).",
-
   "report.title": "PC check report",
   "report.export": "Export report",
   "report.save_title": "Save report",
@@ -735,7 +692,6 @@
   "report.col.issue": "Issue",
   "report.col.recommendation": "Recommendation",
   "report.footer": "Generated by PC Check · scan took {0:0.0} s",
-
   "settings.appearance": "Appearance",
   "settings.language": "Language",
   "settings.language_desc": "Display language of the app and reports.",
@@ -757,5 +713,80 @@
   "settings.admin_no": "No administrator rights – some checks are limited.",
   "settings.data_folder": "Settings folder:",
   "settings.shortcuts": "Shortcuts: F5 – rescan · Ctrl+S – export report · Esc – close dialog.",
-  "settings.credits": "Sensors read with LibreHardwareMonitor (MPL-2.0). System information via WMI and Windows APIs."
+  "settings.credits": "Sensors read with LibreHardwareMonitor (MPL-2.0). System information via WMI and Windows APIs.",
+  "nav.widget": "Widget",
+  "tooltip.widget": "Show / hide the desktop widget",
+  "page.widget.title": "Desktop widget",
+  "page.widget.subtitle": "A small floating panel showing temperatures, CPU, RAM, GPU, network and disk in real time. Drag it anywhere on the screen.",
+  "widget.show": "Show widget",
+  "widget.hide": "Hide widget",
+  "widget.behavior": "Behavior",
+  "widget.visible": "Show widget",
+  "widget.visible_desc": "The widget keeps running when you close the PC Check window. Double-click the widget to reopen the app.",
+  "widget.topmost": "Always on top",
+  "widget.topmost_desc": "Keep the widget above all other windows.",
+  "widget.locked": "Lock position",
+  "widget.locked_desc": "Prevent dragging so it is not moved by accident.",
+  "widget.graphs": "Show graphs",
+  "widget.graphs_desc": "Small history graphs for CPU, GPU, RAM, network and disk.",
+  "widget.autostart": "Start with Windows",
+  "widget.autostart_desc": "Open the widget automatically at sign-in (no main window, no UAC prompt).",
+  "widget.autostart_on": "Enabled: the widget will open when you sign in to Windows.",
+  "widget.autostart_off": "The widget will no longer start with Windows.",
+  "widget.autostart_failed": "Could not change the startup task (Task Scheduler).",
+  "widget.appearance": "Appearance",
+  "widget.opacity": "Opacity",
+  "widget.size": "Size",
+  "widget.size_small": "Small",
+  "widget.size_medium": "Medium",
+  "widget.size_large": "Large",
+  "widget.layout": "Layout",
+  "widget.layout_vertical": "Vertical",
+  "widget.layout_horizontal": "Horizontal",
+  "widget.interval": "Refresh rate",
+  "widget.interval_1": "1 second",
+  "widget.interval_2": "2 seconds",
+  "widget.interval_5": "5 seconds",
+  "widget.reset_position": "Move to top-right corner",
+  "widget.metrics": "Displayed metrics",
+  "widget.metrics_desc": "Pick what to show on the widget. They appear in this order.",
+  "widget.reset_metrics": "Defaults",
+  "widget.preview": "Preview",
+  "widget.tip": "Drag the widget to move it (it snaps to screen edges), double-click to open PC Check, right-click for more options.",
+  "widget.empty": "No metrics selected. Pick some on the Widget page.",
+  "widget.no_sensor": "No sensor yet",
+  "widget.no_battery": "No battery",
+  "widget.hotspot": "Hot spot {0}°C",
+  "widget.menu.open": "Open PC Check",
+  "widget.menu.settings": "Customize widget...",
+  "widget.menu.horizontal": "Horizontal layout",
+  "widget.menu.hide": "Hide widget",
+  "widget.menu.exit": "Exit PC Check",
+  "widget.metric.cpu": "CPU",
+  "widget.metric.cpu_temp": "CPU temp",
+  "widget.metric.gpu": "GPU",
+  "widget.metric.gpu_temp": "GPU temp",
+  "widget.metric.vram": "VRAM",
+  "widget.metric.ram": "RAM",
+  "widget.metric.net": "Network",
+  "widget.metric.disk": "Disk",
+  "widget.metric.disk_temp": "Disk temp",
+  "widget.metric.fans": "Fans",
+  "widget.metric.battery": "Battery",
+  "widget.metric.uptime": "Uptime",
+  "widget.metric.clock": "Clock",
+  "widget.metric_desc.cpu": "Load % and clock speed",
+  "widget.metric_desc.cpu_temp": "CPU temperature and power",
+  "widget.metric_desc.gpu": "Graphics load %",
+  "widget.metric_desc.gpu_temp": "GPU temperature and hot spot",
+  "widget.metric_desc.vram": "Graphics memory in use",
+  "widget.metric_desc.ram": "RAM % and amount in use",
+  "widget.metric_desc.net": "Download / upload speed",
+  "widget.metric_desc.disk": "Busy %, read / write speed",
+  "widget.metric_desc.disk_temp": "Hottest drive",
+  "widget.metric_desc.fans": "Fastest fan speed",
+  "widget.metric_desc.battery": "Battery level (laptops)",
+  "widget.metric_desc.uptime": "Time since last boot",
+  "widget.metric_desc.clock": "Time and date",
+  "sensor.kind.throughput": "throughput"
 }

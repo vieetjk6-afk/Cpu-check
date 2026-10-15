@@ -72,12 +72,12 @@ public sealed class DriversViewModel : PageViewModel
 
     public DriversViewModel(MainViewModel main) : base(main)
     {
-        RescanCommand = new AsyncRelayCommand(RescanAsync, () => HasResult && !IsBusy);
+        RescanCommand = new AsyncRelayCommand(RescanAsync, () => HasResult && !IsBusy && !State.IsScanning);
         ScanHardwareCommand = new AsyncRelayCommand(async () =>
         {
             await Main.RunToolAsync(SystemTools.ScanDevices, false);
             await RescanAsync();
-        }, () => !IsBusy);
+        }, () => !IsBusy && !State.IsScanning);
     }
 
     public IReadOnlyList<DriverProblemItem> Problems { get => _problems; private set => Set(ref _problems, value); }

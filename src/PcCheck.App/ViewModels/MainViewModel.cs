@@ -50,7 +50,7 @@ public sealed class MainViewModel : ObservableObject
     private double _scanPercent;
     private string _scanStep = "";
     private bool _liveBusy;
-    private bool _isActive = true;
+    private bool _mainActive = true;
     private TaskCompletionSource<bool>? _dialogTcs;
 
     public MainViewModel(AppState state)
@@ -66,6 +66,7 @@ public sealed class MainViewModel : ObservableObject
         Cleanup = new CleanupViewModel(this);
         Issues = new IssuesViewModel(this);
         Settings = new SettingsViewModel(this);
+        Widget = new WidgetViewModel(this);
 
         NavItems =
         [
@@ -76,13 +77,14 @@ public sealed class MainViewModel : ObservableObject
             new(Pages.Drivers, "nav.drivers", "", Drivers),
             new(Pages.Cleanup, "nav.cleanup", "", Cleanup),
             new(Pages.Issues, "nav.issues", "", Issues),
+            new(Pages.Widget, "nav.widget", "\uE718", Widget),
         ];
         SettingsNav = new NavItem(Pages.Settings, "nav.settings", "", Settings);
         _selectedNav = NavItems[0];
 
         ScanCommand = new AsyncRelayCommand(ScanAsync, () => !IsScanning);
         NavigateCommand = new RelayCommand(p => Navigate(p as string ?? Pages.Dashboard));
-        ExecuteFixCommand = new AsyncRelayCommand(ExecuteFixAsync);
+        ExecuteFixCommand = new RelayCommand(p => _ = ExecuteFixSafeAsync(p));
         ToggleLanguageCommand = new RelayCommand(() => Settings.Language = Loc.Instance.Language == Loc.Vietnamese ? Loc.English : Loc.Vietnamese);
         ToggleThemeCommand = new RelayCommand(() => Settings.Theme = ThemeManager.IsDark ? ThemeManager.Light : ThemeManager.Dark);
         ExportReportCommand = new AsyncRelayCommand(ExportReportAsync, () => State.Result is not null);
@@ -98,7 +100,7 @@ public sealed class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(LastScanText));
         };
 
-        _liveTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(2) };
+        _liveTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = LiveInterval };
         _liveTimer.Tick += async (_, _) => await TickLiveAsync();
         _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _toastTimer.Tick += (_, _) =>
@@ -106,6 +108,7 @@ public sealed class MainViewModel : ObservableObject
             _toastTimer.Stop();
             IsToastVisible = false;
         };
+        Widget.VisibilityChanged += (_, _) => UpdateLiveTimer();
     }
 
     public AppState State { get; }
@@ -118,6 +121,7 @@ public sealed class MainViewModel : ObservableObject
     public CleanupViewModel Cleanup { get; }
     public IssuesViewModel Issues { get; }
     public SettingsViewModel Settings { get; }
+    public WidgetViewModel Widget { get; }
 
     public ObservableCollection<NavItem> NavItems { get; }
     public NavItem SettingsNav { get; }
@@ -157,6 +161,7 @@ public sealed class MainViewModel : ObservableObject
         private set
         {
             if (!Set(ref _isScanning, value)) return;
+            State.IsScanning = value;
             OnPropertyChanged(nameof(LastScanText));
             System.Windows.Input.CommandManager.InvalidateRequerySuggested();
         }
@@ -197,7 +202,7 @@ public sealed class MainViewModel : ObservableObject
 
     // ---------- Điều hướng & khắc phục ----------
     public RelayCommand NavigateCommand { get; }
-    public AsyncRelayCommand ExecuteFixCommand { get; }
+    public RelayCommand ExecuteFixCommand { get; }
 
     public void Navigate(string page)
     {
@@ -217,6 +222,20 @@ public sealed class MainViewModel : ObservableObject
         }
 
         SelectedNav = page == Pages.Settings ? SettingsNav : NavItems.FirstOrDefault(n => n.Key == page) ?? NavItems[0];
+    }
+
+    /// <summary>Mỗi lần bấm chạy độc lập – không khóa các nút khắc phục khác trong lúc chờ.</summary>
+    private async Task ExecuteFixSafeAsync(object? parameter)
+    {
+        try
+        {
+            await ExecuteFixAsync(parameter);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Thực thi khắc phục lỗi", ex);
+            ShowToast(Loc.F("error.unexpected", ex.Message), true);
+        }
     }
 
     private async Task ExecuteFixAsync(object? parameter)
@@ -328,26 +347,38 @@ public sealed class MainViewModel : ObservableObject
     }
 
     // ---------- Giám sát trực tiếp ----------
-    public void StartLive()
+    private TimeSpan LiveInterval => TimeSpan.FromSeconds(Math.Clamp(State.Settings.LiveIntervalSeconds, 1, 10));
+
+    /// <summary>Cập nhật cảm biến khi cửa sổ chính đang mở (và bật giám sát) hoặc khi widget đang hiện.</summary>
+    public void UpdateLiveTimer()
     {
-        if (!State.Settings.LiveMonitoring) return;
-        _liveTimer.Start();
-        _ = TickLiveAsync();
+        var needed = (_mainActive && State.Settings.LiveMonitoring) || Widget.IsVisible;
+        _liveTimer.Interval = LiveInterval;
+        if (needed && !_liveTimer.IsEnabled)
+        {
+            _liveTimer.Start();
+            _ = TickLiveAsync();
+        }
+        else if (!needed && _liveTimer.IsEnabled)
+        {
+            _liveTimer.Stop();
+        }
     }
 
-    public void StopLive() => _liveTimer.Stop();
+    public void StartLive() => UpdateLiveTimer();
 
-    /// <summary>Tạm dừng cập nhật khi cửa sổ thu nhỏ để tiết kiệm CPU.</summary>
+    public void StopLive() => UpdateLiveTimer();
+
+    /// <summary>Cửa sổ chính hiện / bị thu nhỏ hoặc ẩn (widget vẫn chạy nếu đang hiện).</summary>
     public void SetActive(bool active)
     {
-        _isActive = active;
-        if (active && State.Settings.LiveMonitoring) StartLive();
-        else StopLive();
+        _mainActive = active;
+        UpdateLiveTimer();
     }
 
     private async Task TickLiveAsync()
     {
-        if (_liveBusy || !_isActive) return;
+        if (_liveBusy) return;
         _liveBusy = true;
         try
         {
