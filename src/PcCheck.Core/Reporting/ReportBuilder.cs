@@ -88,7 +88,9 @@ public static class ReportBuilder
         Section(sb, Loc.T("report.section.sensors"));
         Table(sb, null,
         [
-            [Loc.T("sensor.cpu_temp"), Format.Celsius(d.Sensors.CpuTemperature)],
+            [Loc.T("sensor.cpu_temp"), d.Sensors.CpuTemperatureEstimated
+                ? Loc.F("dash.temp_estimated", Format.Celsius(d.Sensors.CpuTemperature))
+                : Format.Celsius(d.Sensors.CpuTemperature)],
             [Loc.T("sensor.cpu_load"), Format.Percent(d.Sensors.CpuLoad)],
             [Loc.T("sensor.gpu_temp"), Format.Celsius(d.Sensors.GpuTemperature)],
             [Loc.T("sensor.gpu_load"), Format.Percent(d.Sensors.GpuLoad)],

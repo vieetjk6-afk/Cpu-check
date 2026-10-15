@@ -78,7 +78,19 @@ public sealed class DeviceCard : ObservableObject
     public string StatusText { get => _statusText; set => Set(ref _statusText, value); }
     public Severity Status { get => _status; set => Set(ref _status, value); }
     public bool IsExpanded { get => _isExpanded; set => Set(ref _isExpanded, value); }
-    public IReadOnlyList<InfoItem> Info { get => _info; set => Set(ref _info, value); }
+
+    /// <summary>Thông tin thiết bị. Chỉ thay khi nội dung đổi để danh sách không bị vẽ lại mỗi lần cập nhật.</summary>
+    public IReadOnlyList<InfoItem> Info
+    {
+        get => _info;
+        set
+        {
+            if (!_info.SequenceEqual(value)) Set(ref _info, value);
+        }
+    }
+
+    /// <summary>Số ổ vật lý (thẻ ổ cứng lấy từ cảm biến), dùng để ghép với kết quả quét khi có nhiều ổ cùng mẫu.</summary>
+    public string? DriveNumber { get; init; }
     public ObservableCollection<SensorSection> Sections { get; } = [];
     public bool HasSensors => Sections.Count > 0;
 
@@ -210,12 +222,14 @@ public sealed class HealthViewModel : PageViewModel
         var hw = State.Result?.Data.Hardware;
 
         // Gom cảm biến theo thiết bị. CPU / RAM / bo mạch có thể gồm nhiều "hardware" con (vd chip SuperIO) -> gộp một thẻ.
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var group in live.Readings.GroupBy(CardKey))
         {
             var first = group.First();
             var isAcpi = group.Key == "acpi";
             var kind = isAcpi ? SensorHardwareKind.Other : first.HardwareKind;
-            var card = GetOrCreate(group.Key, CardName(group.Key, first.Hardware, hw, c), kind, isAcpi);
+            seen.Add(group.Key);
+            var card = GetOrCreate(group.Key, CardName(group.Key, first.Hardware, hw, c), kind, isAcpi, first.DriveNumber);
             foreach (var reading in group)
             {
                 if (reading.Kind == SensorKind.Other) continue;
@@ -225,6 +239,13 @@ public sealed class HealthViewModel : PageViewModel
             UpdateSummary(card, group.ToList(), live, hw, c);
         }
 
+        // Thiết bị không còn cảm biến (vd vùng nhiệt ACPI sau khi đã có cảm biến CPU thật, ổ USB đã rút) -> bỏ thẻ cũ.
+        if (live.Readings.Count > 0)
+        {
+            foreach (var key in _cards.Keys.Where(k => (k == "acpi" || k.StartsWith("hw:", StringComparison.Ordinal)) && !seen.Contains(k)).ToList())
+                Remove(key);
+        }
+
         if (hw is null) return;
 
         // Thiết bị có trong kết quả quét nhưng (chưa) có cảm biến trực tiếp, vd ổ USB hoặc khi bộ đọc cảm biến chưa sẵn sàng.
@@ -232,13 +253,13 @@ public sealed class HealthViewModel : PageViewModel
         foreach (var disk in hw.Disks)
         {
             var key = "disk:" + disk.Number;
-            if (FindStorageCard(disk) is not null)
+            if (FindStorageCard(disk, hw) is not null)
             {
                 Remove(key);
                 continue;
             }
 
-            var card = GetOrCreate(key, Format.OrDash(disk.Model), SensorHardwareKind.Storage, false);
+            var card = GetOrCreate(key, Format.OrDash(disk.Model), SensorHardwareKind.Storage, false, disk.Number);
             UpdateSummary(card, [], live, hw, c);
         }
 
@@ -267,7 +288,7 @@ public sealed class HealthViewModel : PageViewModel
             SensorHardwareKind.Cpu => "cpu",
             SensorHardwareKind.Memory => "memory",
             SensorHardwareKind.Motherboard => "board",
-            _ => "hw:" + r.Hardware,
+            _ => "hw:" + r.DeviceKey,
         };
     }
 
@@ -297,7 +318,7 @@ public sealed class HealthViewModel : PageViewModel
         Devices.Remove(card);
     }
 
-    private DeviceCard GetOrCreate(string key, string name, SensorHardwareKind kind, bool isAcpi)
+    private DeviceCard GetOrCreate(string key, string name, SensorHardwareKind kind, bool isAcpi, string? driveNumber = null)
     {
         if (_cards.TryGetValue(key, out var existing)) return existing;
         var order = isAcpi ? 7 : kind switch
@@ -314,6 +335,7 @@ public sealed class HealthViewModel : PageViewModel
         var displayName = isAcpi ? Loc.T("device.acpi_name") : name;
         var card = new DeviceCard(key, displayName, kind, order, isAcpi ? "" : GlyphFor(kind))
         {
+            DriveNumber = driveNumber,
             IsExpanded = _expanded.TryGetValue(key, out var e) && e,
             TypeText = Loc.T(isAcpi ? "device.type.acpi" : kind switch
             {
@@ -327,6 +349,7 @@ public sealed class HealthViewModel : PageViewModel
                 _ => "device.type.other",
             }),
         };
+        if (driveNumber is not null) card.TypeText += " · " + Loc.F("device.disk_number", driveNumber);
         card.PropertyChanged += (_, e2) =>
         {
             if (e2.PropertyName == nameof(DeviceCard.IsExpanded)) _expanded[card.Key] = card.IsExpanded;
@@ -339,28 +362,36 @@ public sealed class HealthViewModel : PageViewModel
         return card;
     }
 
-    private DeviceCard? FindStorageCard(DiskInfo disk)
+    /// <summary>Thẻ cảm biến của một ổ: ghép theo số ổ vật lý; chỉ ghép theo tên mẫu khi không có số và tên là duy nhất.</summary>
+    private DeviceCard? FindStorageCard(DiskInfo disk, HardwareInfo hw)
     {
+        var storage = _cards.Values.Where(card => card.Kind == SensorHardwareKind.Storage && card.Key.StartsWith("hw:", StringComparison.Ordinal)).ToList();
+        var byNumber = storage.FirstOrDefault(card => card.DriveNumber is not null && card.DriveNumber == disk.Number);
+        if (byNumber is not null) return byNumber;
+
         var model = Normalize(disk.Model);
-        if (model.Length == 0) return null;
-        return _cards.Values.FirstOrDefault(card =>
-            card.Kind == SensorHardwareKind.Storage && card.Key.StartsWith("hw:", StringComparison.Ordinal)
-            && (Normalize(card.Name).Contains(model, StringComparison.Ordinal) || model.Contains(Normalize(card.Name), StringComparison.Ordinal)));
+        if (model.Length == 0 || hw.Disks.Count(d => Normalize(d.Model) == model) > 1) return null;
+        return storage.FirstOrDefault(card => card.DriveNumber is null && SameModel(card.Name, model));
     }
 
     private static string Normalize(string text) =>
         new(text.Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
 
-    private DiskInfo? FindDisk(DeviceCard card, HardwareInfo? hw)
+    private static bool SameModel(string name, string normalizedModel)
+    {
+        var n = Normalize(name);
+        return n.Length > 0 && normalizedModel.Length > 0
+               && (n.Contains(normalizedModel, StringComparison.Ordinal) || normalizedModel.Contains(n, StringComparison.Ordinal));
+    }
+
+    private static DiskInfo? FindDisk(DeviceCard card, HardwareInfo? hw)
     {
         if (hw is null) return null;
         if (card.Key.StartsWith("disk:", StringComparison.Ordinal)) return hw.Disks.FirstOrDefault(d => "disk:" + d.Number == card.Key);
-        var name = Normalize(card.Name);
-        return hw.Disks.FirstOrDefault(d =>
-        {
-            var model = Normalize(d.Model);
-            return model.Length > 0 && (name.Contains(model, StringComparison.Ordinal) || model.Contains(name, StringComparison.Ordinal));
-        });
+        if (card.DriveNumber is not null && hw.Disks.FirstOrDefault(d => d.Number == card.DriveNumber) is { } byNumber) return byNumber;
+
+        var matches = hw.Disks.Where(d => SameModel(card.Name, Normalize(d.Model))).ToList();
+        return matches.Count == 1 ? matches[0] : null;
     }
 
     /// <summary>Giá trị tóm tắt ở tiêu đề thẻ + phần thông tin thiết bị lấy từ kết quả quét.</summary>
@@ -561,6 +592,13 @@ public sealed class HealthViewModel : PageViewModel
 
     private Severity TempSeverity(SensorReading r)
     {
+        // Vùng nhiệt ACPI chỉ là ước lượng -> tối đa "cảnh báo".
+        if (r.Id.StartsWith(ThermalZoneReader.IdPrefix, StringComparison.Ordinal))
+        {
+            var acpi = Thresholds.TemperatureSeverity(r.Value, 85, 100);
+            return acpi == Severity.Critical ? Severity.Warning : acpi;
+        }
+
         var (warn, critical) = r.HardwareKind switch
         {
             SensorHardwareKind.Cpu => (Thresholds.CpuTempWarn, Thresholds.CpuTempCritical),

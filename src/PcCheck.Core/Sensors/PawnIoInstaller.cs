@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using PcCheck.Core.Fixes;
 using PcCheck.Core.Util;
 using static PcCheck.Core.Localization.LocFactory;
@@ -8,7 +10,8 @@ namespace PcCheck.Core.Sensors;
 
 /// <summary>
 /// Cài driver PawnIO (mã nguồn mở, có chữ ký số) để đọc nhiệt độ CPU chính xác – người dùng chỉ cần bấm 1 nút.
-/// Tải bản chính thức từ GitHub qua HTTPS, kiểm tra chữ ký Authenticode hợp lệ rồi mới chạy "-install -silent".
+/// Tải bản chính thức từ GitHub qua HTTPS vào thư mục chỉ admin ghi được, khóa tệp, kiểm tra chữ ký Authenticode
+/// rồi mới chạy "-install -silent" – tiến trình thường không thể tráo tệp giữa lúc kiểm tra và lúc chạy.
 /// </summary>
 public static class PawnIoInstaller
 {
@@ -17,25 +20,57 @@ public static class PawnIoInstaller
 
     private const long MaxDownloadBytes = 30L * 1024 * 1024;
     private const int ErrorSuccessRebootRequired = 3010;
+    private const int ErrorCancelled = 1223;
+    private static readonly TimeSpan DownloadTimeout = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan InstallTimeout = TimeSpan.FromMinutes(3);
+
+    private static readonly object Sync = new();
+    private static Process? _running;
+
+    /// <summary>Trình cài đặt từ lần trước vẫn đang chạy (vd đã quá thời gian chờ nhưng chưa thoát).</summary>
+    public static bool IsRunning
+    {
+        get
+        {
+            lock (Sync)
+            {
+                try
+                {
+                    return _running is { HasExited: false };
+                }
+                catch (InvalidOperationException)
+                {
+                    return false;
+                }
+            }
+        }
+    }
 
     public static async Task<FixOutcome> InstallAsync(IProgress<string>? progress = null, CancellationToken ct = default)
     {
-        var path = Path.Combine(Path.GetTempPath(), $"PawnIO_setup_{Guid.NewGuid():N}.exe");
+        if (IsRunning) return new FixOutcome(false, L("cpu_sensor.busy"));
+
+        var elevated = Elevation.IsAdministrator();
+        string dir;
+        try
+        {
+            dir = CreateWorkDirectory(elevated);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Không tạo được thư mục tạm cho PawnIO", ex);
+            return new FixOutcome(false, L("cpu_sensor.result.failed", ex.Message));
+        }
+
+        var path = Path.Combine(dir, "PawnIO_setup.exe");
+        var keepFiles = false;
         try
         {
             progress?.Report("download");
-            using (var http = new HttpClient { Timeout = TimeSpan.FromMinutes(3) })
-            {
-                http.DefaultRequestHeaders.UserAgent.ParseAdd("PCCheck/1.0");
-                using var response = await http.GetAsync(DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-                response.EnsureSuccessStatusCode();
-                if (response.Content.Headers.ContentLength is > MaxDownloadBytes) return new FixOutcome(false, L("cpu_sensor.result.download_failed"));
+            if (!await DownloadAsync(path, ct).ConfigureAwait(false)) return new FixOutcome(false, L("cpu_sensor.result.download_failed"));
 
-                await using var source = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-                await using var target = File.Create(path);
-                await source.CopyToAsync(target, ct).ConfigureAwait(false);
-                if (target.Length > MaxDownloadBytes || target.Length < 10_000) return new FixOutcome(false, L("cpu_sensor.result.download_failed"));
-            }
+            // Giữ khóa đọc (không cho ghi / xóa / đổi tên) từ lúc kiểm tra chữ ký tới khi tiến trình đã chạy.
+            using var fileLock = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
 
             progress?.Report("verify");
             if (!Authenticode.IsTrusted(path))
@@ -46,39 +81,50 @@ public static class PawnIoInstaller
 
             progress?.Report("install");
             // Ứng dụng thường đã chạy với quyền admin; nếu chưa thì để Windows hỏi UAC.
-            var elevated = Elevation.IsAdministrator();
-            using var process = Process.Start(new ProcessStartInfo(path, "-install -silent")
+            var process = Process.Start(new ProcessStartInfo(path, "-install -silent")
             {
                 UseShellExecute = !elevated,
                 Verb = elevated ? "" : "runas",
                 CreateNoWindow = true,
-                WorkingDirectory = Path.GetDirectoryName(path)!,
+                WorkingDirectory = dir,
             });
             if (process is null) return new FixOutcome(false, L("cpu_sensor.result.failed", "-1"));
+            lock (Sync) _running = process;
 
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeout.CancelAfter(TimeSpan.FromMinutes(3));
-            await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+            timeout.CancelAfter(InstallTimeout);
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Trình cài vẫn chạy: không xóa tệp, dọn khi nó thoát; chặn lần cài mới cho tới lúc đó.
+                Log.Warn("Cài PawnIO quá thời gian chờ – trình cài vẫn đang chạy");
+                keepFiles = true;
+                process.EnableRaisingEvents = true;
+                process.Exited += (_, _) => FinishBackground(process, dir);
+                if (process.HasExited) FinishBackground(process, dir);
+                return new FixOutcome(false, L("cpu_sensor.result.timeout"));
+            }
 
-            Log.Info($"PawnIO setup kết thúc với mã {process.ExitCode}");
-            return process.ExitCode switch
+            var exitCode = process.ExitCode;
+            lock (Sync)
+            {
+                if (ReferenceEquals(_running, process)) _running = null;
+            }
+
+            process.Dispose();
+            Log.Info($"PawnIO setup kết thúc với mã {exitCode}");
+            return exitCode switch
             {
                 0 => new FixOutcome(true, L("cpu_sensor.result.ok")),
                 ErrorSuccessRebootRequired => new FixOutcome(true, L("cpu_sensor.result.reboot")),
+                ErrorCancelled => new FixOutcome(false, L("cpu_sensor.result.cancelled")),
                 var code => new FixOutcome(false, L("cpu_sensor.result.failed", code)),
             };
         }
-        catch (HttpRequestException ex)
-        {
-            Log.Warn("Tải PawnIO lỗi", ex);
-            return new FixOutcome(false, L("cpu_sensor.result.download_failed"));
-        }
-        catch (TaskCanceledException ex)
-        {
-            Log.Warn("Cài PawnIO quá thời gian", ex);
-            return new FixOutcome(false, L("cpu_sensor.result.download_failed"));
-        }
-        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == ErrorCancelled)
         {
             // Người dùng bấm "No" ở hộp thoại UAC.
             return new FixOutcome(false, L("cpu_sensor.result.cancelled"));
@@ -90,16 +136,108 @@ public static class PawnIoInstaller
         }
         finally
         {
-            try
+            if (!keepFiles) DeleteDirectory(dir);
+        }
+    }
+
+    /// <summary>Tải tệp cài; thời gian chờ áp dụng cho cả phần thân (HttpClient.Timeout không bao phần đọc luồng).</summary>
+    private static async Task<bool> DownloadAsync(string path, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(DownloadTimeout);
+        try
+        {
+            using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("PCCheck/1.0");
+            using var response = await http.GetAsync(DownloadUrl, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            if (response.Content.Headers.ContentLength is > MaxDownloadBytes) return false;
+
+            await using var source = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
+            await using var target = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            var buffer = new byte[81920];
+            long total = 0;
+            int read;
+            while ((read = await source.ReadAsync(buffer, timeout.Token).ConfigureAwait(false)) > 0)
             {
-                if (File.Exists(path)) File.Delete(path);
+                total += read;
+                if (total > MaxDownloadBytes) return false;
+                await target.WriteAsync(buffer.AsMemory(0, read), timeout.Token).ConfigureAwait(false);
             }
-            catch (IOException)
-            {
-            }
-            catch (UnauthorizedAccessException)
-            {
-            }
+
+            return total >= 10_000;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or IOException)
+        {
+            Log.Warn("Tải PawnIO lỗi", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Khi chạy với quyền admin: thư mục riêng trong ProgramData chỉ Administrators / SYSTEM ghi được, để tiến trình
+    /// thường của người dùng không thể thay tệp cài trước khi nó chạy với quyền cao. Chưa có quyền admin thì dùng %TEMP%
+    /// (Windows sẽ hỏi UAC và hiện nhà phát hành của tệp).
+    /// </summary>
+    private static string CreateWorkDirectory(bool elevated)
+    {
+        var name = "pawnio-" + Guid.NewGuid().ToString("N");
+        if (!elevated || !OperatingSystem.IsWindows())
+        {
+            var temp = Path.Combine(Path.GetTempPath(), name);
+            Directory.CreateDirectory(temp);
+            return temp;
+        }
+
+        var parent = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "PcCheck");
+        Directory.CreateDirectory(parent);
+        var security = new DirectorySecurity();
+        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+        foreach (var sid in new[] { WellKnownSidType.BuiltinAdministratorsSid, WellKnownSidType.LocalSystemSid })
+        {
+            security.AddAccessRule(new FileSystemAccessRule(
+                new SecurityIdentifier(sid, null),
+                FileSystemRights.FullControl,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None,
+                AccessControlType.Allow));
+        }
+
+        security.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
+        var path = Path.Combine(parent, name);
+        new DirectoryInfo(path).Create(security);
+        return path;
+    }
+
+    private static void FinishBackground(Process process, string dir)
+    {
+        lock (Sync)
+        {
+            if (ReferenceEquals(_running, process)) _running = null;
+        }
+
+        try
+        {
+            Log.Info($"PawnIO setup (chạy nền) kết thúc với mã {process.ExitCode}");
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        DeleteDirectory(dir);
+    }
+
+    private static void DeleteDirectory(string dir)
+    {
+        try
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 }

@@ -33,6 +33,10 @@ public enum SensorKind
     Other,
 }
 
+/// <param name="HardwareId">
+/// Định danh thiết bị của LibreHardwareMonitor (vd "/nvme/1" – số cuối là số ổ vật lý). Dùng để phân biệt
+/// các thiết bị trùng tên (2 ổ cùng mẫu). Null với cảm biến không thuộc LHM (vùng nhiệt ACPI).
+/// </param>
 public sealed record SensorReading(
     string Id,
     string Hardware,
@@ -41,7 +45,22 @@ public sealed record SensorReading(
     SensorKind Kind,
     float? Value,
     float? Min,
-    float? Max);
+    float? Max,
+    string? HardwareId = null)
+{
+    /// <summary>Khóa nhóm theo thiết bị: định danh nếu có, không thì tên.</summary>
+    public string DeviceKey => HardwareId ?? Hardware;
+
+    /// <summary>Số ổ vật lý (PhysicalDriveN) của cảm biến ổ cứng, lấy từ định danh "/nvme/N", "/hdd/N"...</summary>
+    public string? DriveNumber => HardwareKind == SensorHardwareKind.Storage ? DriveNumberOf(HardwareId) : null;
+
+    public static string? DriveNumberOf(string? hardwareId)
+    {
+        if (string.IsNullOrEmpty(hardwareId)) return null;
+        var last = hardwareId[(hardwareId.LastIndexOf('/') + 1)..];
+        return last.Length > 0 && last.All(char.IsAsciiDigit) ? last : null;
+    }
+}
 
 /// <summary>Nhiệt độ tóm tắt của một thiết bị (CPU, GPU, từng ổ cứng...).</summary>
 public sealed record DeviceTemperature(string Name, SensorHardwareKind Kind, float Celsius, bool Estimated);
@@ -135,19 +154,32 @@ public sealed class SensorSnapshot
     public IReadOnlyList<DeviceTemperature> DeviceTemperatures()
     {
         var list = new List<DeviceTemperature>();
-        foreach (var group in Readings.Where(r => !r.Id.StartsWith("/acpi/", StringComparison.Ordinal)).GroupBy(r => (r.Hardware, r.HardwareKind)))
+        foreach (var group in Readings.Where(r => !r.Id.StartsWith("/acpi/", StringComparison.Ordinal)).GroupBy(r => (r.DeviceKey, r.HardwareKind)))
         {
             var readings = group.ToList();
             var temp = group.Key.HardwareKind == SensorHardwareKind.Cpu
                 ? PickCpuTemperature(readings)
                 : readings.Where(r => r.Kind == SensorKind.Temperature && r.Value is > 0 and < 150).Select(r => r.Value).DefaultIfEmpty(null).Max();
-            if (temp is not null) list.Add(new DeviceTemperature(group.Key.Hardware, group.Key.HardwareKind, temp.Value, false));
+            if (temp is not null) list.Add(new DeviceTemperature(readings[0].Hardware, group.Key.HardwareKind, temp.Value, false));
         }
 
         if (!list.Any(d => d.Kind == SensorHardwareKind.Cpu) && AcpiTemperature is { } acpi)
             list.Add(new DeviceTemperature("CPU", SensorHardwareKind.Cpu, acpi, true));
 
-        return list.OrderBy(d => d.Kind).ThenBy(d => d.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        var sorted = list.OrderBy(d => d.Kind).ThenBy(d => d.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+        // Thiết bị trùng tên (vd 2 ổ cùng mẫu) -> đánh số để phân biệt.
+        foreach (var same in sorted.GroupBy(d => d.Name, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).ToList())
+        {
+            var n = 0;
+            foreach (var device in same.ToList())
+            {
+                n++;
+                sorted[sorted.IndexOf(device)] = device with { Name = $"{device.Name} ({n})" };
+            }
+        }
+
+        return sorted;
     }
 
     /// <summary>Ưu tiên cảm biến tổng (Package / Tctl) rồi mới tới trung bình / cao nhất các nhân.</summary>

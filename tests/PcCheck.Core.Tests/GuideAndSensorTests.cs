@@ -202,6 +202,37 @@ public sealed class GuideAndSensorTests
     }
 
     [Fact]
+    public void IdenticalDrivesStaySeparate()
+    {
+        var snapshot = new SensorSnapshot
+        {
+            Readings =
+            [
+                new SensorReading("/nvme/0/temperature/0", "Samsung SSD 980", SensorHardwareKind.Storage, "Composite Temperature", SensorKind.Temperature, 40, null, null, "/nvme/0"),
+                new SensorReading("/nvme/1/temperature/0", "Samsung SSD 980", SensorHardwareKind.Storage, "Composite Temperature", SensorKind.Temperature, 55, null, null, "/nvme/1"),
+            ],
+        };
+
+        var list = snapshot.DeviceTemperatures();
+
+        Assert.Equal(2, list.Count);
+        Assert.Equal(["Samsung SSD 980 (1)", "Samsung SSD 980 (2)"], list.Select(d => d.Name).Order());
+        Assert.Equal([40f, 55f], list.Select(d => d.Celsius).Order());
+        Assert.Equal("1", snapshot.Readings[1].DriveNumber);
+    }
+
+    [Theory]
+    [InlineData("/nvme/1", "1")]
+    [InlineData("/hdd/12", "12")]
+    [InlineData("/intelcpu/0", "0")]
+    [InlineData("/lpc/nct6798d", null)]
+    [InlineData(null, null)]
+    public void DriveNumberComesFromHardwareId(string? id, string? expected)
+    {
+        Assert.Equal(expected, SensorReading.DriveNumberOf(id));
+    }
+
+    [Fact]
     public void WidgetCollapsedSettingRoundTrips()
     {
         var settings = new AppSettings();

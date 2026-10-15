@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using LibreHardwareMonitor.Hardware;
+using Microsoft.Win32;
 using PcCheck.Core.Models;
 using PcCheck.Core.Util;
 
@@ -76,12 +77,23 @@ public sealed class SensorService : IDisposable
         }
     }
 
-    [MethodImpl(MethodImplOptions.NoInlining)]
+    /// <summary>
+    /// Đọc trực tiếp khóa gỡ cài đặt của PawnIO (giống LibreHardwareMonitor) – không dùng PawnIo.IsInstalled vì giá trị đó
+    /// chỉ được đọc một lần khi khởi động, nên sẽ sai ngay sau khi vừa cài driver.
+    /// </summary>
     private static bool? ReadPawnIo()
     {
+        if (!OperatingSystem.IsWindows()) return null;
         try
         {
-            return LibreHardwareMonitor.PawnIo.PawnIo.IsInstalled;
+            foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+            {
+                using var root = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
+                using var key = root.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PawnIO");
+                if (key?.GetValue("DisplayVersion") is string version && !string.IsNullOrWhiteSpace(version)) return true;
+            }
+
+            return false;
         }
         catch (Exception ex)
         {
@@ -199,7 +211,8 @@ public sealed class SensorService : IDisposable
                 sensorKind,
                 Sanitize(sensor.Value),
                 Sanitize(sensor.Min),
-                Sanitize(sensor.Max)));
+                Sanitize(sensor.Max),
+                top.Identifier.ToString()));
         }
 
         foreach (var sub in hardware.SubHardware)

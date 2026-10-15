@@ -68,7 +68,9 @@ public sealed class HardwareViewModel : PageViewModel
                 new(Loc.T("hw.cpu.cache"), $"L2 {Format.Bytes(cpu.L2CacheKb * 1024L, c)} · L3 {Format.Bytes(cpu.L3CacheKb * 1024L, c)}"),
                 new(Loc.T("hw.cpu.socket"), Format.OrDash(cpu.Socket)),
                 new(Loc.T("hw.cpu.virtualization"), Labels.YesNo(cpu.VirtualizationEnabled == true || hw.Computer.HypervisorPresent ? true : cpu.VirtualizationEnabled)),
-                new(Loc.T("hw.cpu.temp_now"), Format.Celsius(result.Data.Sensors.CpuTemperature, c)),
+                new(Loc.T("hw.cpu.temp_now"), result.Data.Sensors.CpuTemperatureEstimated
+                    ? Loc.F("dash.temp_estimated", Format.Celsius(result.Data.Sensors.CpuTemperature, c))
+                    : Format.Celsius(result.Data.Sensors.CpuTemperature, c)),
             ]));
         }
 

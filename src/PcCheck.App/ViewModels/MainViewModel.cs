@@ -255,7 +255,7 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        if (action.Kind == FixKind.RunTool && action.Arg == SystemTools.CpuSensor && _installingCpuSensor)
+        if (action.Kind == FixKind.RunTool && action.Arg == SystemTools.CpuSensor && (_installingCpuSensor || PawnIoInstaller.IsRunning))
         {
             ShowToast(Loc.T("cpu_sensor.busy"));
             return;
