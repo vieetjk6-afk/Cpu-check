@@ -15,9 +15,11 @@ public sealed class Loc : INotifyPropertyChanged
     public const string English = "en";
     public static readonly IReadOnlyList<string> SupportedLanguages = [Vietnamese, English];
 
+    // Cache phải khai báo trước Instance: khởi tạo tĩnh chạy theo thứ tự trong file.
+    private static readonly Dictionary<string, Dictionary<string, string>> Cache = new(StringComparer.OrdinalIgnoreCase);
+
     public static Loc Instance { get; } = new();
 
-    private static readonly Dictionary<string, Dictionary<string, string>> Cache = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, string> _current;
     private readonly Dictionary<string, string> _fallback;
 

@@ -15,7 +15,7 @@ public static class CleanupAnalyzer
         {
             yield return new Issue
             {
-                Id = "junk.total",
+                Id = "junk/total",
                 Category = IssueCategory.Junk,
                 Severity = junkBytes >= Thresholds.JunkWarnBytes ? Severity.Warning : Severity.Info,
                 Title = L("issue.junk.title", new ByteSize(junkBytes)),
@@ -31,7 +31,7 @@ public static class CleanupAnalyzer
             var crack = bloat.Any(p => p.BloatReasonKey == SoftwareCatalog.ReasonCrack);
             yield return new Issue
             {
-                Id = "software.bloat",
+                Id = "software/bloat",
                 Category = IssueCategory.Software,
                 Severity = crack ? Severity.Critical : Severity.Warning,
                 Title = L("issue.bloat.title", bloat.Count),
@@ -47,7 +47,7 @@ public static class CleanupAnalyzer
             var size = unused.Sum(p => p.SizeBytes ?? 0);
             yield return new Issue
             {
-                Id = "software.unused",
+                Id = "software/unused",
                 Category = IssueCategory.Software,
                 Severity = Severity.Info,
                 Title = L("issue.unused.title", unused.Count, Thresholds.UnusedDays),
@@ -62,7 +62,7 @@ public static class CleanupAnalyzer
         {
             yield return new Issue
             {
-                Id = "startup.count",
+                Id = "startup/count",
                 Category = IssueCategory.Software,
                 Severity = enabledStartup >= Thresholds.StartupWarn ? Severity.Warning : Severity.Info,
                 Title = L("issue.startup.title", enabledStartup),

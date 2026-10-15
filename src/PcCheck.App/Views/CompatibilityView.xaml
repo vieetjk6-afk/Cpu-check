@@ -1,0 +1,89 @@
+<UserControl x:Class="PcCheck.App.Views.CompatibilityView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:PcCheck.App.Infrastructure"
+             xmlns:views="clr-namespace:PcCheck.App.Views">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="32,28,32,36">
+            <Grid Margin="0,0,0,22">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="{l:T page.compatibility.title}" Style="{StaticResource H1}" />
+                    <TextBlock Text="{l:T page.compatibility.subtitle}" Style="{StaticResource Body}" Margin="0,4,0,0" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                            Visibility="{Binding HasResult, Converter={StaticResource BoolToVis}}">
+                    <Border Style="{StaticResource Badge}" Background="{StaticResource SuccessSoftBrush}" Padding="12,5">
+                        <TextBlock Foreground="{StaticResource SuccessBrush}" FontWeight="SemiBold">
+                            <Run Text="{Binding PassCount, Mode=OneWay}" /> <Run Text="{l:T check.pass}" />
+                        </TextBlock>
+                    </Border>
+                    <Border Style="{StaticResource Badge}" Background="{StaticResource WarningSoftBrush}" Padding="12,5" Margin="8,0,0,0">
+                        <TextBlock Foreground="{StaticResource WarningBrush}" FontWeight="SemiBold">
+                            <Run Text="{Binding WarnCount, Mode=OneWay}" /> <Run Text="{l:T check.warning}" />
+                        </TextBlock>
+                    </Border>
+                    <Border Style="{StaticResource Badge}" Background="{StaticResource DangerSoftBrush}" Padding="12,5" Margin="8,0,0,0">
+                        <TextBlock Foreground="{StaticResource DangerBrush}" FontWeight="SemiBold">
+                            <Run Text="{Binding FailCount, Mode=OneWay}" /> <Run Text="{l:T check.fail}" />
+                        </TextBlock>
+                    </Border>
+                </StackPanel>
+            </Grid>
+
+            <views:EmptyState Visibility="{Binding NoResult, Converter={StaticResource BoolToVis}}" />
+
+            <ItemsControl ItemsSource="{Binding Groups}" Focusable="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,14" Padding="20,16">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Title}" Style="{StaticResource H2}" Margin="0,0,0,6" />
+                                <ItemsControl ItemsSource="{Binding Items}" Focusable="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,12">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Width="32" Height="32" CornerRadius="9" VerticalAlignment="Top"
+                                                            Background="{Binding Status, Converter={StaticResource SeverityBrush}, ConverterParameter=soft}">
+                                                        <TextBlock Style="{StaticResource Icon}" FontSize="14"
+                                                                   Text="{Binding Status, Converter={StaticResource SeverityGlyph}}"
+                                                                   Foreground="{Binding Status, Converter={StaticResource SeverityBrush}}" />
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Margin="14,0,14,0">
+                                                        <TextBlock Text="{Binding Title}" Style="{StaticResource H3}" />
+                                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Body}" Margin="0,3,0,0" />
+                                                        <TextBlock Text="{Binding Recommendation}" Style="{StaticResource Body}" Margin="0,6,0,0"
+                                                                   Foreground="{DynamicResource TextBrush}"
+                                                                   Visibility="{Binding Recommendation, Converter={StaticResource EmptyToCollapsed}}" />
+                                                        <ItemsControl ItemsSource="{Binding Fixes}" Margin="0,8,0,-6" Focusable="False"
+                                                                      ItemsPanel="{StaticResource WrapPanelTemplate}"
+                                                                      ItemTemplate="{StaticResource FixButtonTemplate}"
+                                                                      Visibility="{Binding Fixes, Converter={StaticResource EmptyToCollapsed}}" />
+                                                    </StackPanel>
+                                                    <Border Grid.Column="2" Style="{StaticResource Badge}" VerticalAlignment="Top"
+                                                            Background="{Binding Status, Converter={StaticResource SeverityBrush}, ConverterParameter=soft}">
+                                                        <TextBlock Text="{Binding StatusText}" FontSize="11.5" FontWeight="SemiBold"
+                                                                   Foreground="{Binding Status, Converter={StaticResource SeverityBrush}}" />
+                                                    </Border>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

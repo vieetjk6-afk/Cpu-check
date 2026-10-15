@@ -21,7 +21,7 @@ public static class HardwareAnalyzer
         {
             yield return new Issue
             {
-                Id = "temp.cpu",
+                Id = "temp/cpu",
                 Category = IssueCategory.Temperature,
                 Severity = cpuSeverity,
                 Title = L("issue.cpu_hot.title", Math.Round(cpuTemp!.Value)),
@@ -34,7 +34,7 @@ public static class HardwareAnalyzer
         {
             yield return new Issue
             {
-                Id = "temp.cpu_idle",
+                Id = "temp/cpu_idle",
                 Category = IssueCategory.Temperature,
                 Severity = Severity.Warning,
                 Title = L("issue.cpu_idle_hot.title", Math.Round(cpuTemp.Value)),
@@ -48,7 +48,7 @@ public static class HardwareAnalyzer
         {
             yield return new Issue
             {
-                Id = "temp.pawnio",
+                Id = "temp/pawnio",
                 Category = IssueCategory.Temperature,
                 Severity = Severity.Info,
                 Title = L("issue.pawnio.title"),
@@ -65,7 +65,7 @@ public static class HardwareAnalyzer
         {
             yield return new Issue
             {
-                Id = "temp.gpu",
+                Id = "temp/gpu",
                 Category = IssueCategory.Temperature,
                 Severity = gpuSeverity,
                 Title = L("issue.gpu_hot.title", Math.Round(gpuTemp!.Value)),
@@ -93,7 +93,7 @@ public static class HardwareAnalyzer
         {
             yield return new Issue
             {
-                Id = "battery.wear",
+                Id = "battery/wear",
                 Category = IssueCategory.Hardware,
                 Severity = wear >= Thresholds.BatteryWearWarn ? Severity.Warning : Severity.Info,
                 Title = L("issue.battery_wear.title", Math.Round(wear)),
@@ -109,7 +109,7 @@ public static class HardwareAnalyzer
         {
             yield return new Issue
             {
-                Id = "ram.usage",
+                Id = "ram/usage",
                 Category = IssueCategory.Hardware,
                 Severity = ramUsed >= Thresholds.RamUsageWarn ? Severity.Warning : Severity.Info,
                 Title = L("issue.ram_usage.title", Math.Round(ramUsed)),
@@ -124,7 +124,7 @@ public static class HardwareAnalyzer
         {
             yield return new Issue
             {
-                Id = "gpu.error." + gpu.PnpDeviceId,
+                Id = "gpu/error/" + gpu.PnpDeviceId,
                 Category = IssueCategory.Hardware,
                 Severity = Severity.Critical,
                 Title = L("issue.gpu_error.title", gpu.Name),
@@ -144,7 +144,7 @@ public static class HardwareAnalyzer
         {
             yield return new Issue
             {
-                Id = "disk.failing." + disk.Number,
+                Id = "disk/failing/" + disk.Number,
                 Category = IssueCategory.Storage,
                 Severity = Severity.Critical,
                 Title = L("issue.disk_failing.title", name),
@@ -157,7 +157,7 @@ public static class HardwareAnalyzer
         {
             yield return new Issue
             {
-                Id = "disk.warning." + disk.Number,
+                Id = "disk/warning/" + disk.Number,
                 Category = IssueCategory.Storage,
                 Severity = Severity.Warning,
                 Title = L("issue.disk_warning.title", name),
@@ -171,7 +171,7 @@ public static class HardwareAnalyzer
         {
             yield return new Issue
             {
-                Id = "disk.wear." + disk.Number,
+                Id = "disk/wear/" + disk.Number,
                 Category = IssueCategory.Storage,
                 Severity = wear >= Thresholds.SsdWearCritical ? Severity.Critical : Severity.Warning,
                 Title = L("issue.ssd_wear.title", name, wear),
@@ -186,7 +186,7 @@ public static class HardwareAnalyzer
         {
             yield return new Issue
             {
-                Id = "disk.errors." + disk.Number,
+                Id = "disk/errors/" + disk.Number,
                 Category = IssueCategory.Storage,
                 Severity = Severity.Warning,
                 Title = L("issue.disk_errors.title", name),
@@ -204,7 +204,7 @@ public static class HardwareAnalyzer
         {
             yield return new Issue
             {
-                Id = "disk.temp." + disk.Number,
+                Id = "disk/temp/" + disk.Number,
                 Category = IssueCategory.Temperature,
                 Severity = tempSeverity,
                 Title = L("issue.disk_hot.title", name, disk.TemperatureC),
@@ -235,7 +235,7 @@ public static class HardwareAnalyzer
         if (severity == Severity.Ok) return null;
         return new Issue
         {
-            Id = "volume.space." + volume.Letter,
+            Id = "volume/space/" + volume.Letter,
             Category = IssueCategory.Storage,
             Severity = severity,
             Title = L("issue.low_space.title", volume.Letter, new ByteSize(volume.FreeBytes)),

@@ -1,0 +1,185 @@
+<Window x:Class="PcCheck.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:PcCheck.App.Infrastructure"
+        Title="PC Check"
+        Width="1300" Height="840" MinWidth="1020" MinHeight="660"
+        WindowStartupLocation="CenterScreen"
+        Icon="Assets/app.ico"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource TextBrush}"
+        FontFamily="{StaticResource UiFont}"
+        FontSize="13"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="236" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ================= Thanh bên ================= -->
+        <Border Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0">
+            <DockPanel Margin="14,20,14,14">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,0,0,24">
+                    <Image Source="Assets/app.png" Width="36" Height="36" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <StackPanel Margin="11,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="PC Check" FontSize="18" FontWeight="SemiBold" FontFamily="{StaticResource DisplayFont}" />
+                        <TextBlock Text="{l:T app.tagline}" Style="{StaticResource Caption}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Bottom">
+                    <Border Style="{StaticResource SubCard}" Margin="0,0,0,10" Padding="12">
+                        <StackPanel>
+                            <Button Style="{StaticResource PrimaryButton}" Command="{Binding ScanCommand}" HorizontalAlignment="Stretch">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE721;" Foreground="White" FontSize="14" />
+                                    <TextBlock Text="{l:T scan.button}" Margin="8,0,0,0" />
+                                </StackPanel>
+                            </Button>
+                            <ProgressBar Margin="0,10,0,0" Maximum="100" Value="{Binding ScanPercent, Mode=OneWay}"
+                                         Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}" />
+                            <TextBlock Margin="2,8,2,0" Style="{StaticResource Caption}" TextWrapping="Wrap" TextTrimming="None"
+                                       Text="{Binding ScanStep}" Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}" />
+                            <TextBlock Margin="2,8,2,0" Style="{StaticResource Caption}" TextWrapping="Wrap" TextTrimming="None"
+                                       Text="{Binding LastScanText}" Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Command="{Binding NavigateCommand}" CommandParameter="settings" HorizontalContentAlignment="Left" Padding="12,9">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSettingsSelected}" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource NavSelectedBrush}" />
+                                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE713;" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                <TextBlock Text="{l:T nav.settings}" Margin="12,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="1" Style="{StaticResource GhostButton}" Command="{Binding ToggleLanguageCommand}"
+                                ToolTip="{l:T tooltip.language}" Margin="4,0,0,0" MinWidth="36">
+                            <TextBlock Text="{l:T lang.short}" FontWeight="SemiBold" FontSize="12" />
+                        </Button>
+                        <Button Grid.Column="2" Style="{StaticResource GhostButton}" Command="{Binding ToggleThemeCommand}"
+                                ToolTip="{l:T tooltip.theme}" Margin="2,0,0,0" MinWidth="36">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE793;" FontSize="14"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </Button>
+                    </Grid>
+                </StackPanel>
+
+                <ListBox ItemsSource="{Binding NavItems}" SelectedItem="{Binding SelectedNav}"
+                         ItemContainerStyle="{StaticResource NavItemStyle}"
+                         Background="Transparent" BorderThickness="0" Focusable="False"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="28" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource Icon}" Text="{Binding Glyph}" HorizontalAlignment="Left"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" />
+                                <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="13.5" VerticalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" />
+                                <Border Grid.Column="2" CornerRadius="9" MinWidth="20" Height="18" Padding="6,0"
+                                        Background="{Binding BadgeSeverity, Converter={StaticResource SeverityBrush}}"
+                                        Visibility="{Binding Badge, Converter={StaticResource EmptyToCollapsed}}">
+                                    <TextBlock Text="{Binding Badge}" FontSize="11" FontWeight="SemiBold" Foreground="White"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <!-- ================= Nội dung ================= -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Background="{StaticResource WarningSoftBrush}" Padding="20,9"
+                    Visibility="{Binding IsAdmin, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Style="{StaticResource Icon}" Text="&#xE7BA;" Foreground="{StaticResource WarningBrush}" />
+                    <TextBlock Text="{l:T banner.not_admin}" Margin="10,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <ContentControl Grid.Row="1" Content="{Binding CurrentPage}" Focusable="False" />
+
+            <!-- Thông báo nhanh -->
+            <Border Grid.Row="1" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="24,0,24,26"
+                    MaxWidth="640" CornerRadius="12" Padding="16,11" BorderThickness="1"
+                    Background="{DynamicResource CardAltBrush}" BorderBrush="{DynamicResource LineBrush}"
+                    Visibility="{Binding IsToastVisible, Converter={StaticResource BoolToVis}}">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="24" ShadowDepth="4" Opacity="0.35" Color="Black" />
+                </Border.Effect>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource Icon}" Text="&#xE73E;" Foreground="{StaticResource SuccessBrush}"
+                               Visibility="{Binding ToastIsError, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+                    <TextBlock Style="{StaticResource Icon}" Text="&#xE7BA;" Foreground="{StaticResource DangerBrush}"
+                               Visibility="{Binding ToastIsError, Converter={StaticResource BoolToVis}}" />
+                    <TextBlock Grid.Column="1" Text="{Binding ToastText}" Margin="12,0,12,0" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <Button Grid.Column="2" Style="{StaticResource GhostButton}" Command="{Binding CloseToastCommand}" Padding="6,4">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE711;" FontSize="11"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- ================= Hộp thoại xác nhận ================= -->
+        <Grid Grid.ColumnSpan="2" Background="{DynamicResource OverlayBrush}"
+              Visibility="{Binding IsDialogOpen, Converter={StaticResource BoolToVis}}">
+            <Border Style="{StaticResource Card}" Width="480" Padding="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="40" ShadowDepth="8" Opacity="0.4" Color="Black" />
+                </Border.Effect>
+                <StackPanel>
+                    <TextBlock Text="{Binding DialogTitle}" Style="{StaticResource H2}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding DialogMessage}" Style="{StaticResource Body}" Margin="0,12,0,0" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,24,0,0">
+                        <Button Content="{l:T dialog.cancel}" Command="{Binding DialogCancelCommand}" IsCancel="True" Margin="0,0,10,0" MinWidth="96" />
+                        <Button Content="{Binding DialogConfirmText}" Command="{Binding DialogConfirmCommand}" MinWidth="110">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding DialogIsDanger}" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource DangerBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

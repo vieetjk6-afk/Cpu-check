@@ -79,7 +79,7 @@ public static class DriverAnalyzer
             var fixes = new List<FixAction> { FixCatalog.SearchDriver(p.Device), FixCatalog.OptionalUpdates, FixCatalog.DeviceManager };
             yield return new Issue
             {
-                Id = "driver." + p.Kind + "." + p.Device.DeviceId,
+                Id = "driver/" + p.Kind + "." + p.Device.DeviceId,
                 Category = IssueCategory.Driver,
                 Severity = p.Severity,
                 Title = p.Kind == DriverProblemKind.Missing ? L("issue.driver_missing.title", p.Device.Name) : L("issue.driver_error.title", p.Device.Name),
@@ -101,7 +101,7 @@ public static class DriverAnalyzer
                 fixes.Add(FixCatalog.SearchDriver(p.Device));
                 yield return new Issue
                 {
-                    Id = "driver.generic_display",
+                    Id = "driver/generic_display",
                     Category = IssueCategory.Driver,
                     Severity = Severity.Critical,
                     Title = L("issue.driver_basic_display.title"),
@@ -117,7 +117,7 @@ public static class DriverAnalyzer
                 fixes.Add(FixCatalog.OptionalUpdates);
                 yield return new Issue
                 {
-                    Id = "driver.generic_audio",
+                    Id = "driver/generic_audio",
                     Category = IssueCategory.Driver,
                     Severity = Severity.Info,
                     Title = L("issue.driver_generic_audio.title"),
@@ -133,7 +133,7 @@ public static class DriverAnalyzer
         {
             yield return new Issue
             {
-                Id = "driver.unsigned",
+                Id = "driver/unsigned",
                 Category = IssueCategory.Driver,
                 Severity = Severity.Warning,
                 Title = L("issue.driver_unsigned.title", unsigned.Count),
@@ -150,7 +150,7 @@ public static class DriverAnalyzer
             if (oemPage is not null) fixes.Add(FixCatalog.VendorDrivers(oemPage));
             yield return new Issue
             {
-                Id = "driver.outdated",
+                Id = "driver/outdated",
                 Category = IssueCategory.Driver,
                 Severity = Severity.Info,
                 Title = L("issue.driver_outdated.title", outdated.Count),
@@ -165,7 +165,7 @@ public static class DriverAnalyzer
         {
             yield return new Issue
             {
-                Id = "driver.disabled",
+                Id = "driver/disabled",
                 Category = IssueCategory.Driver,
                 Severity = Severity.Info,
                 Title = L("issue.driver_disabled.title", disabled.Count),

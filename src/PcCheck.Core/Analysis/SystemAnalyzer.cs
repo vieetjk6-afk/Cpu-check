@@ -36,7 +36,7 @@ public static class SystemAnalyzer
 
             yield return new Issue
             {
-                Id = "events.bsod",
+                Id = "events/bsod",
                 Category = IssueCategory.System,
                 Severity = bsodCount >= 3 ? Severity.Critical : Severity.Warning,
                 Title = L("issue.bsod.title", bsodCount, days),
@@ -54,7 +54,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "events.power_loss",
+                Id = "events/power_loss",
                 Category = IssueCategory.System,
                 Severity = powerLoss >= 5 ? Severity.Critical : Severity.Warning,
                 Title = L("issue.power_loss.title", powerLoss, days),
@@ -71,7 +71,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "events.whea",
+                Id = "events/whea",
                 Category = IssueCategory.Hardware,
                 Severity = fatal > 0 ? Severity.Critical : Severity.Warning,
                 Title = fatal > 0 ? L("issue.whea_fatal.title", fatal) : L("issue.whea.title", corrected),
@@ -87,7 +87,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "events.disk",
+                Id = "events/disk",
                 Category = IssueCategory.Storage,
                 Severity = diskErrors >= 5 ? Severity.Critical : Severity.Warning,
                 Title = L("issue.disk_events.title", diskErrors, days),
@@ -102,7 +102,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "events.storage_reset",
+                Id = "events/storage_reset",
                 Category = IssueCategory.Storage,
                 Severity = Severity.Warning,
                 Title = L("issue.storage_reset.title", resets, days),
@@ -117,7 +117,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "events.ntfs",
+                Id = "events/ntfs",
                 Category = IssueCategory.Storage,
                 Severity = Severity.Warning,
                 Title = L("issue.ntfs.title", fsErrors),
@@ -133,7 +133,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "events.tdr",
+                Id = "events/tdr",
                 Category = IssueCategory.Driver,
                 Severity = tdr >= 5 ? Severity.Critical : Severity.Warning,
                 Title = L("issue.tdr.title", tdr, days),
@@ -148,7 +148,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "events.low_memory",
+                Id = "events/low_memory",
                 Category = IssueCategory.Hardware,
                 Severity = Severity.Warning,
                 Title = L("issue.low_memory.title", lowMem),
@@ -171,7 +171,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "events.app_crash",
+                Id = "events/app_crash",
                 Category = IssueCategory.Software,
                 Severity = crashers[0].Count >= 10 ? Severity.Warning : Severity.Info,
                 Title = L("issue.app_crash.title", crashers.Count),
@@ -191,7 +191,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "system.not_admin",
+                Id = "system/not_admin",
                 Category = IssueCategory.System,
                 Severity = Severity.Info,
                 Title = L("issue.not_admin.title"),
@@ -206,7 +206,7 @@ public static class SystemAnalyzer
             var win10 = !os.IsWindows11;
             yield return new Issue
             {
-                Id = "system.eos",
+                Id = "system/eos",
                 Category = IssueCategory.Security,
                 Severity = Severity.Warning,
                 Title = win10 ? L("issue.win10_eos.title") : L("issue.win_version_eos.title", os.DisplayVersion),
@@ -220,7 +220,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "system.pending_reboot",
+                Id = "system/pending_reboot",
                 Category = IssueCategory.System,
                 Severity = Severity.Warning,
                 Title = L("issue.pending_reboot.title"),
@@ -233,7 +233,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "system.uptime",
+                Id = "system/uptime",
                 Category = IssueCategory.System,
                 Severity = Severity.Info,
                 Title = L("issue.uptime.title", (int)s.Uptime.TotalDays),
@@ -249,7 +249,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "security.no_av",
+                Id = "security/no_av",
                 Category = IssueCategory.Security,
                 Severity = Severity.Critical,
                 Title = L("issue.no_av.title"),
@@ -267,7 +267,7 @@ public static class SystemAnalyzer
             {
                 yield return new Issue
                 {
-                    Id = "security.av_outdated",
+                    Id = "security/av_outdated",
                     Category = IssueCategory.Security,
                     Severity = Severity.Warning,
                     Title = L("issue.av_outdated.title"),
@@ -281,7 +281,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "security.firewall",
+                Id = "security/firewall",
                 Category = IssueCategory.Security,
                 Severity = s.FirewallDisabledProfiles.Contains("Public") ? Severity.Warning : Severity.Info,
                 Title = L("issue.firewall.title"),
@@ -294,7 +294,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "security.uac",
+                Id = "security/uac",
                 Category = IssueCategory.Security,
                 Severity = Severity.Warning,
                 Title = L("issue.uac.title"),
@@ -307,7 +307,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "system.activation",
+                Id = "system/activation",
                 Category = IssueCategory.System,
                 Severity = Severity.Warning,
                 Title = L("issue.activation.title"),
@@ -320,7 +320,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "system.updates",
+                Id = "system/updates",
                 Category = IssueCategory.Security,
                 Severity = Severity.Warning,
                 Title = L("issue.updates.title", (int)(now - last).TotalDays),
@@ -333,7 +333,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "system.pagefile",
+                Id = "system/pagefile",
                 Category = IssueCategory.System,
                 Severity = Severity.Warning,
                 Title = L("issue.pagefile.title"),
@@ -346,7 +346,7 @@ public static class SystemAnalyzer
         {
             yield return new Issue
             {
-                Id = "system.windows_old",
+                Id = "system/windows_old",
                 Category = IssueCategory.Junk,
                 Severity = Severity.Info,
                 Title = L("issue.windows_old.title"),

@@ -1,0 +1,97 @@
+<UserControl x:Class="PcCheck.App.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:PcCheck.App.Infrastructure">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="32,28,32,36" MaxWidth="900" HorizontalAlignment="Left">
+            <StackPanel Margin="0,0,0,22">
+                <TextBlock Text="{l:T page.settings.title}" Style="{StaticResource H1}" />
+                <TextBlock Text="{l:T page.settings.subtitle}" Style="{StaticResource Body}" Margin="0,4,0,0" />
+            </StackPanel>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="{l:T settings.appearance}" Style="{StaticResource H2}" Margin="0,0,0,14" />
+
+                    <Grid Margin="0,0,0,16">
+                        <StackPanel Margin="0,0,320,0">
+                            <TextBlock Text="{l:T settings.language}" Style="{StaticResource H3}" />
+                            <TextBlock Text="{l:T settings.language_desc}" Style="{StaticResource Caption}" TextWrapping="Wrap" TextTrimming="None" />
+                        </StackPanel>
+                        <Border Style="{StaticResource SegmentHost}" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Style="{StaticResource SegmentButton}" GroupName="Lang" Content="Tiếng Việt"
+                                             IsChecked="{Binding Language, Converter={StaticResource Equals}, ConverterParameter=vi}" />
+                                <RadioButton Style="{StaticResource SegmentButton}" GroupName="Lang" Content="English"
+                                             IsChecked="{Binding Language, Converter={StaticResource Equals}, ConverterParameter=en}" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <Grid>
+                        <StackPanel Margin="0,0,320,0">
+                            <TextBlock Text="{l:T settings.theme}" Style="{StaticResource H3}" />
+                            <TextBlock Text="{l:T settings.theme_desc}" Style="{StaticResource Caption}" TextWrapping="Wrap" TextTrimming="None" />
+                        </StackPanel>
+                        <Border Style="{StaticResource SegmentHost}" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Style="{StaticResource SegmentButton}" GroupName="Theme" Content="{l:T settings.theme_dark}"
+                                             IsChecked="{Binding Theme, Converter={StaticResource Equals}, ConverterParameter=dark}" />
+                                <RadioButton Style="{StaticResource SegmentButton}" GroupName="Theme" Content="{l:T settings.theme_light}"
+                                             IsChecked="{Binding Theme, Converter={StaticResource Equals}, ConverterParameter=light}" />
+                                <RadioButton Style="{StaticResource SegmentButton}" GroupName="Theme" Content="{l:T settings.theme_system}"
+                                             IsChecked="{Binding Theme, Converter={StaticResource Equals}, ConverterParameter=system}" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="{l:T settings.behavior}" Style="{StaticResource H2}" Margin="0,0,0,14" />
+                    <Grid Margin="0,0,0,16">
+                        <StackPanel Margin="0,0,80,0">
+                            <TextBlock Text="{l:T settings.autoscan}" Style="{StaticResource H3}" />
+                            <TextBlock Text="{l:T settings.autoscan_desc}" Style="{StaticResource Caption}" TextWrapping="Wrap" TextTrimming="None" />
+                        </StackPanel>
+                        <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding AutoScan}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    </Grid>
+                    <Grid>
+                        <StackPanel Margin="0,0,80,0">
+                            <TextBlock Text="{l:T settings.live}" Style="{StaticResource H3}" />
+                            <TextBlock Text="{l:T settings.live_desc}" Style="{StaticResource Caption}" TextWrapping="Wrap" TextTrimming="None" />
+                        </StackPanel>
+                        <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding LiveMonitoring}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="{l:T settings.report}" Style="{StaticResource H2}" Margin="0,0,0,8" />
+                    <TextBlock Text="{l:T settings.report_desc}" Style="{StaticResource Body}" Margin="0,0,0,14" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource PrimaryButton}" Command="{Binding Main.ExportReportCommand}" Content="{l:T report.export}" Margin="0,0,10,0" />
+                        <Button Command="{Binding OpenLogsCommand}" Content="{l:T settings.open_logs}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="{l:T settings.about}" Style="{StaticResource H2}" Margin="0,0,0,10" />
+                    <TextBlock Style="{StaticResource Body}">
+                        <Run Text="PC Check" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" /> <Run Text="{Binding Version, Mode=OneWay}" />
+                    </TextBlock>
+                    <TextBlock Text="{Binding AdminStatus}" Style="{StaticResource Body}" Margin="0,4,0,0" />
+                    <TextBlock Style="{StaticResource Body}" Margin="0,4,0,0">
+                        <Run Text="{l:T settings.data_folder}" /> <Run Text="{Binding DataFolder, Mode=OneWay}" />
+                    </TextBlock>
+                    <TextBlock Text="{l:T settings.shortcuts}" Style="{StaticResource Body}" Margin="0,10,0,0" />
+                    <TextBlock Text="{l:T settings.credits}" Style="{StaticResource Caption}" TextWrapping="Wrap" TextTrimming="None" Margin="0,10,0,0" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
