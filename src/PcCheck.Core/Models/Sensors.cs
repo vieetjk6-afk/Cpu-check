@@ -43,6 +43,9 @@ public sealed record SensorReading(
     float? Min,
     float? Max);
 
+/// <summary>Nhiệt độ tóm tắt của một thiết bị (CPU, GPU, từng ổ cứng...).</summary>
+public sealed record DeviceTemperature(string Name, SensorHardwareKind Kind, float Celsius, bool Estimated);
+
 public sealed class SensorSnapshot
 {
     public static readonly SensorSnapshot Empty = new() { Available = false };
@@ -55,7 +58,20 @@ public sealed class SensorSnapshot
 
     public IReadOnlyList<SensorReading> Readings { get; init; } = [];
 
-    public float? CpuTemperature => PickCpuTemperature(Readings);
+    /// <summary>Nhiệt độ CPU: từ cảm biến của CPU, nếu không có thì ước lượng từ vùng nhiệt ACPI.</summary>
+    public float? CpuTemperature => PickCpuTemperature(Readings) ?? AcpiTemperature;
+
+    /// <summary>True khi <see cref="CpuTemperature"/> chỉ là ước lượng từ ACPI (chưa có driver đọc cảm biến CPU).</summary>
+    public bool CpuTemperatureEstimated => PickCpuTemperature(Readings) is null && AcpiTemperature is not null;
+
+    /// <summary>Có cảm biến nhiệt độ thật của CPU (không tính ACPI).</summary>
+    public bool HasCpuSensor => PickCpuTemperature(Readings) is not null;
+
+    public float? AcpiTemperature =>
+        Readings.Where(r => r.Id.StartsWith("/acpi/", StringComparison.Ordinal) && r.Value is not null)
+            .Select(r => r.Value)
+            .DefaultIfEmpty(null)
+            .Max();
     public float? CpuLoad => Pick(Readings, SensorHardwareKind.Cpu, SensorKind.Load, "CPU Total", "Total");
     public float? GpuTemperature => Pick(Readings, SensorHardwareKind.Gpu, SensorKind.Temperature, "GPU Core", "GPU Hot Spot", "Core");
     public float? GpuLoad => Pick(Readings, SensorHardwareKind.Gpu, SensorKind.Load, "GPU Core", "D3D 3D", "Core");
@@ -112,8 +128,30 @@ public sealed class SensorSnapshot
             .DefaultIfEmpty(null)
             .Max();
 
+    /// <summary>
+    /// Nhiệt độ đại diện của từng thiết bị (CPU trước, rồi GPU, bo mạch, ổ cứng...). Vùng nhiệt ACPI chỉ được dùng
+    /// làm nhiệt độ CPU ước lượng khi không có cảm biến CPU thật.
+    /// </summary>
+    public IReadOnlyList<DeviceTemperature> DeviceTemperatures()
+    {
+        var list = new List<DeviceTemperature>();
+        foreach (var group in Readings.Where(r => !r.Id.StartsWith("/acpi/", StringComparison.Ordinal)).GroupBy(r => (r.Hardware, r.HardwareKind)))
+        {
+            var readings = group.ToList();
+            var temp = group.Key.HardwareKind == SensorHardwareKind.Cpu
+                ? PickCpuTemperature(readings)
+                : readings.Where(r => r.Kind == SensorKind.Temperature && r.Value is > 0 and < 150).Select(r => r.Value).DefaultIfEmpty(null).Max();
+            if (temp is not null) list.Add(new DeviceTemperature(group.Key.Hardware, group.Key.HardwareKind, temp.Value, false));
+        }
+
+        if (!list.Any(d => d.Kind == SensorHardwareKind.Cpu) && AcpiTemperature is { } acpi)
+            list.Add(new DeviceTemperature("CPU", SensorHardwareKind.Cpu, acpi, true));
+
+        return list.OrderBy(d => d.Kind).ThenBy(d => d.Name, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
     /// <summary>Ưu tiên cảm biến tổng (Package / Tctl) rồi mới tới trung bình / cao nhất các nhân.</summary>
-    internal static float? PickCpuTemperature(IReadOnlyList<SensorReading> readings)
+    public static float? PickCpuTemperature(IReadOnlyList<SensorReading> readings)
     {
         var temps = readings
             .Where(r => r.HardwareKind == SensorHardwareKind.Cpu && r.Kind == SensorKind.Temperature && r.Value is > 0 and < 150)
@@ -130,7 +168,7 @@ public sealed class SensorSnapshot
         return temps.Max(t => t.Value);
     }
 
-    internal static float? Pick(IReadOnlyList<SensorReading> readings, SensorHardwareKind hw, SensorKind kind, params string[] names)
+    public static float? Pick(IReadOnlyList<SensorReading> readings, SensorHardwareKind hw, SensorKind kind, params string[] names)
     {
         var candidates = readings.Where(r => r.HardwareKind == hw && r.Kind == kind && r.Value is not null).ToList();
         if (candidates.Count == 0) return null;

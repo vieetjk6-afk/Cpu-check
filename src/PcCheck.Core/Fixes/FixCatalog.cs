@@ -44,7 +44,7 @@ public static class FixCatalog
     public static FixAction StorageSense => Uri("ms-settings:storagesense", "fix.storage_sense");
     public static FixAction DisplaySettings => Uri("ms-settings:display-advanced", "fix.display_settings");
     public static FixAction BackupSettings => Uri("ms-settings:backup", "fix.backup");
-    public static FixAction PawnIo => Uri("https://pawnio.eu/", "fix.install_pawnio");
+    public static FixAction EnableCpuSensor => Tool(SystemTools.CpuSensor, "fix.enable_cpu_sensor", confirm: true);
     public static FixAction Windows11Download => Uri("https://www.microsoft.com/software-download/windows11", "fix.win11_download");
 
     public static FixAction DeviceManager => Tool(SystemTools.DeviceManager, "tool.devmgmt.name");

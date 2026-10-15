@@ -16,7 +16,11 @@ public static class HardwareAnalyzer
         // --- Nhiệt độ CPU ---
         var cpuTemp = sensors.CpuTemperature;
         var cpuLoad = sensors.CpuLoad;
+        var estimated = sensors.CpuTemperatureEstimated;
         var cpuSeverity = Thresholds.TemperatureSeverity(cpuTemp, Thresholds.CpuTempWarn, Thresholds.CpuTempCritical);
+
+        // Nhiệt độ ước lượng từ ACPI kém chính xác: tối đa chỉ cảnh báo, không kết luận "nghiêm trọng".
+        if (estimated && cpuSeverity == Severity.Critical) cpuSeverity = Severity.Warning;
         if (cpuSeverity >= Severity.Warning)
         {
             yield return new Issue
@@ -25,12 +29,14 @@ public static class HardwareAnalyzer
                 Category = IssueCategory.Temperature,
                 Severity = cpuSeverity,
                 Title = L("issue.cpu_hot.title", Math.Round(cpuTemp!.Value)),
-                Detail = L("issue.cpu_hot.detail", Math.Round(cpuTemp.Value), Math.Round(cpuLoad ?? 0)),
+                Detail = estimated
+                    ? L("issue.cpu_hot.detail_estimated", Math.Round(cpuTemp.Value), Math.Round(cpuLoad ?? 0))
+                    : L("issue.cpu_hot.detail", Math.Round(cpuTemp.Value), Math.Round(cpuLoad ?? 0)),
                 Recommendation = L("issue.cpu_hot.rec"),
                 Fixes = [FixCatalog.HealthPage, FixCatalog.PowerOptions],
             };
         }
-        else if (cpuTemp >= Thresholds.CpuIdleTempWarn && cpuLoad is < 25)
+        else if (!estimated && cpuTemp >= Thresholds.CpuIdleTempWarn && cpuLoad is < 25)
         {
             yield return new Issue
             {
@@ -44,17 +50,17 @@ public static class HardwareAnalyzer
             };
         }
 
-        if (sensors.Available && cpuTemp is null && sensors.PawnIoInstalled == false)
+        if (!sensors.HasCpuSensor && sensors.PawnIoInstalled == false)
         {
             yield return new Issue
             {
                 Id = "temp/pawnio",
                 Category = IssueCategory.Temperature,
                 Severity = Severity.Info,
-                Title = L("issue.pawnio.title"),
-                Detail = L("issue.pawnio.detail"),
+                Title = estimated ? L("issue.pawnio.title_estimated") : L("issue.pawnio.title"),
+                Detail = estimated ? L("issue.pawnio.detail_estimated", Math.Round(cpuTemp!.Value)) : L("issue.pawnio.detail"),
                 Recommendation = L("issue.pawnio.rec"),
-                Fixes = [FixCatalog.PawnIo],
+                Fixes = [FixCatalog.EnableCpuSensor],
             };
         }
 

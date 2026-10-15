@@ -74,6 +74,13 @@
                             </StackPanel>
                             <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowGraphs}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
+                        <Grid Margin="0,0,0,14">
+                            <StackPanel Margin="0,0,70,0">
+                                <TextBlock Text="{l:T widget.collapse}" Style="{StaticResource H3}" />
+                                <TextBlock Text="{l:T widget.collapse_desc}" Style="{StaticResource Caption}" TextWrapping="Wrap" TextTrimming="None" />
+                            </StackPanel>
+                            <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding Collapsed}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
                         <Grid>
                             <StackPanel Margin="0,0,70,0">
                                 <TextBlock Text="{l:T widget.autostart}" Style="{StaticResource H3}" />

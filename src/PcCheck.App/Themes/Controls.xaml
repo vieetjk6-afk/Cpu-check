@@ -186,6 +186,61 @@
         <Setter Property="FontSize" Value="12.5" />
     </Style>
 
+    <!-- Tiêu đề bấm để mở rộng / thu gọn (thẻ lỗi, thẻ thiết bị, mục phần cứng) -->
+    <Style x:Key="ExpandHeader" TargetType="ToggleButton">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="10" Padding="{TemplateBinding Padding}"
+                            BorderThickness="1" BorderBrush="Transparent">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Mũi tên mở rộng: xoay 180° khi đang mở. Đặt Tag = trạng thái IsExpanded. -->
+    <Style x:Key="Chevron" TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+        <Setter Property="Text" Value="&#xE70D;" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <RotateTransform Angle="0" />
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
+                <Setter Property="RenderTransform">
+                    <Setter.Value>
+                        <RotateTransform Angle="180" />
+                    </Setter.Value>
+                </Setter>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Thẻ có hiệu ứng rê chuột (thẻ bấm được để mở rộng) -->
+    <Style x:Key="HoverCard" TargetType="Border" BasedOn="{StaticResource Card}">
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="BorderBrush" Value="{DynamicResource ScrollThumbBrush}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- ===== Menu điều hướng ===== -->
     <Style x:Key="NavItemStyle" TargetType="ListBoxItem">
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />

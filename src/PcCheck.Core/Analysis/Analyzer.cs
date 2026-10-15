@@ -24,6 +24,7 @@ public static class Analyzer
             .OrderByDescending(i => i.Severity)
             .ThenBy(i => i.Category)
             .ToList();
+        IssueGuides.Attach(unique);
 
         return new ScanResult
         {

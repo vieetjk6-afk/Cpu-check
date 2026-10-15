@@ -130,6 +130,9 @@ public static class FixService
                 Start("SystemPropertiesPerformance.exe");
                 return new FixOutcome(true, L("fix.result.opened"));
 
+            case SystemTools.CpuSensor:
+                return await Sensors.PawnIoInstaller.InstallAsync(null, ct).ConfigureAwait(false);
+
             case SystemTools.StoreReset:
                 Start("wsreset.exe");
                 return new FixOutcome(true, L("fix.result.opened"));

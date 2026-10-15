@@ -26,6 +26,9 @@ public static class SystemTools
     public const string BatteryReport = "battery-report";
     public const string StoreReset = "wsreset";
 
+    /// <summary>Cài driver PawnIO để đọc nhiệt độ CPU chính xác (tải bản chính thức, kiểm tra chữ ký, cài im lặng).</summary>
+    public const string CpuSensor = "cpu-sensor";
+
     /// <summary>Danh sách hiển thị ở mục "Công cụ sửa lỗi nhanh". Glyph là mã Segoe MDL2 Assets.</summary>
     public static IReadOnlyList<SystemTool> QuickTools { get; } =
     [

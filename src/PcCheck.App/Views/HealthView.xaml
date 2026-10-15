@@ -9,9 +9,9 @@
                 <TextBlock Text="{l:T page.health.subtitle}" Style="{StaticResource Body}" Margin="0,4,0,0" />
             </StackPanel>
 
-            <!-- Thiếu PawnIO -->
+            <!-- Chưa có cảm biến CPU thật: đang dùng nhiệt độ ước lượng (ACPI) hoặc chưa đọc được -->
             <Border Style="{StaticResource Card}" Background="{StaticResource InfoSoftBrush}" BorderBrush="{StaticResource InfoBrush}" Margin="0,0,0,14"
-                    Visibility="{Binding PawnIoMissing, Converter={StaticResource BoolToVis}}">
+                    Visibility="{Binding CpuSensorMissing, Converter={StaticResource BoolToVis}}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -20,11 +20,11 @@
                     </Grid.ColumnDefinitions>
                     <TextBlock Style="{StaticResource Icon}" Text="&#xE946;" Foreground="{StaticResource InfoBrush}" FontSize="18" VerticalAlignment="Top" />
                     <StackPanel Grid.Column="1" Margin="12,0,12,0">
-                        <TextBlock Text="{l:T issue.pawnio.title}" Style="{StaticResource H3}" />
-                        <TextBlock Text="{l:T issue.pawnio.detail}" Style="{StaticResource Body}" Margin="0,4,0,0" />
+                        <TextBlock Text="{l:T health.cpu_sensor.title}" Style="{StaticResource H3}" />
+                        <TextBlock Text="{Binding CpuSensorText}" Style="{StaticResource Body}" Margin="0,4,0,0" />
                     </StackPanel>
-                    <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" VerticalAlignment="Center" Content="{l:T fix.install_pawnio}"
-                            Command="{Binding Main.ExecuteFixCommand}" CommandParameter="{Binding PawnIoFix}" />
+                    <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" VerticalAlignment="Center" Content="{l:T fix.enable_cpu_sensor}"
+                            Command="{Binding Main.ExecuteFixCommand}" CommandParameter="{Binding EnableCpuSensorFix}" />
                 </Grid>
             </Border>
 
@@ -41,89 +41,180 @@
                 <ContentControl Content="{Binding Fans}" ContentTemplate="{StaticResource StatTileTemplate}" Focusable="False" />
             </UniformGrid>
 
-            <!-- Sức khỏe ổ cứng -->
-            <Border Style="{StaticResource Card}" Margin="0,2,0,14" Visibility="{Binding Disks, Converter={StaticResource EmptyToCollapsed}}">
+            <!-- Từng thiết bị -->
+            <Grid Margin="0,6,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock Text="{l:T health.disks}" Style="{StaticResource H2}" />
-                    <TextBlock Text="{l:T health.disks_desc}" Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap" TextTrimming="None" />
-                    <ItemsControl ItemsSource="{Binding Disks}" ItemTemplate="{StaticResource InfoGroupTemplate}" Focusable="False" />
+                    <TextBlock Text="{l:T health.devices}" Style="{StaticResource H2}" />
+                    <TextBlock Text="{l:T health.devices_desc}" Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap" TextTrimming="None" />
                 </StackPanel>
-            </Border>
-
-            <!-- Pin -->
-            <Border Style="{StaticResource Card}" Margin="0,0,0,14" Visibility="{Binding Battery, Converter={StaticResource EmptyToCollapsed}}">
-                <StackPanel>
-                    <Grid>
-                        <TextBlock Text="{l:T hw.battery}" Style="{StaticResource H2}" />
-                        <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right" Content="{l:T tool.battery-report.name}"
-                                Command="{Binding BatteryReportCommand}" />
-                    </Grid>
-                    <ContentControl Content="{Binding Battery}" ContentTemplate="{StaticResource InfoGroupTemplate}" Focusable="False" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource GhostButton}" Command="{Binding ExpandAllCommand}" Margin="0,0,4,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE8A9;" FontSize="13" />
+                            <TextBlock Text="{l:T common.expand_all}" Margin="6,0,0,0" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource GhostButton}" Command="{Binding CollapseAllCommand}" Margin="0,0,4,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE73F;" FontSize="13" />
+                            <TextBlock Text="{l:T common.collapse_all}" Margin="6,0,0,0" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource GhostButton}" Command="{Binding BatteryReportCommand}"
+                            Visibility="{Binding HasBattery, Converter={StaticResource BoolToVis}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE83F;" FontSize="13" />
+                            <TextBlock Text="{l:T tool.battery-report.name}" Margin="6,0,0,0" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
-            </Border>
+            </Grid>
 
-            <!-- Tất cả cảm biến -->
-            <TextBlock Text="{l:T health.all_sensors}" Style="{StaticResource H2}" Margin="0,4,0,4" />
-            <TextBlock Text="{l:T health.all_sensors_desc}" Style="{StaticResource Caption}" Margin="0,0,0,12" />
-            <ItemsControl ItemsSource="{Binding SensorGroups}" Focusable="False">
+            <ItemsControl ItemsSource="{Binding Devices}" Focusable="False">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border Style="{StaticResource Card}" Padding="18,14" Margin="0,0,0,12">
+                        <Border Style="{StaticResource HoverCard}" Padding="16,12" Margin="0,0,0,10">
                             <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                    <TextBlock Style="{StaticResource Icon}" Text="{Binding Glyph}" Foreground="{DynamicResource AccentBrush}" />
-                                    <TextBlock Text="{Binding Title}" Style="{StaticResource H3}" Margin="10,0,0,0" />
+                                <ToggleButton Style="{StaticResource ExpandHeader}" IsChecked="{Binding IsExpanded}" AutomationProperties.Name="{Binding Name}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="40" Height="40" CornerRadius="11"
+                                                Background="{Binding PrimarySeverity, Converter={StaticResource SeverityBrush}, ConverterParameter=soft}">
+                                            <TextBlock Style="{StaticResource Icon}" Text="{Binding Glyph}" FontSize="17"
+                                                       Foreground="{Binding PrimarySeverity, Converter={StaticResource SeverityBrush}}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="14,0,12,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding TypeText}" Style="{StaticResource Caption}" />
+                                            <TextBlock Text="{Binding Name}" Style="{StaticResource H3}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
+                                            <TextBlock Text="{Binding Secondary}" Style="{StaticResource Caption}" Margin="0,2,0,0"
+                                                       Visibility="{Binding Secondary, Converter={StaticResource EmptyToCollapsed}}" />
+                                        </StackPanel>
+                                        <Border Grid.Column="2" Style="{StaticResource Badge}" Margin="0,0,14,0"
+                                                Visibility="{Binding StatusText, Converter={StaticResource EmptyToCollapsed}}"
+                                                Background="{Binding Status, Converter={StaticResource SeverityBrush}, ConverterParameter=soft}">
+                                            <TextBlock Text="{Binding StatusText}" FontSize="11.5" FontWeight="SemiBold"
+                                                       Foreground="{Binding Status, Converter={StaticResource SeverityBrush}}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="3" VerticalAlignment="Center" MinWidth="70">
+                                            <TextBlock Text="{Binding Primary}" FontFamily="{StaticResource DisplayFont}" FontSize="22" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Right">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding PrimarySeverity}" Value="Warning">
+                                                                <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding PrimarySeverity}" Value="Critical">
+                                                                <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding PrimaryLabel}" Style="{StaticResource Caption}" HorizontalAlignment="Right"
+                                                       Visibility="{Binding PrimaryLabel, Converter={StaticResource EmptyToCollapsed}}" />
+                                        </StackPanel>
+                                        <Border Grid.Column="4" Width="30" Height="30" CornerRadius="8" Margin="14,0,0,0" Background="{DynamicResource CardAltBrush}">
+                                            <TextBlock Style="{StaticResource Chevron}" Tag="{Binding IsExpanded}" />
+                                        </Border>
+                                    </Grid>
+                                </ToggleButton>
+
+                                <!-- Chi tiết -->
+                                <StackPanel Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}" Margin="0,4,0,4">
+                                    <ItemsControl ItemsSource="{Binding Info}" Margin="0,10,0,0" Focusable="False"
+                                                  Visibility="{Binding Info, Converter={StaticResource EmptyToCollapsed}}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <UniformGrid Columns="4" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="0,4,14,6">
+                                                    <TextBlock Text="{Binding Label}" Style="{StaticResource Caption}" />
+                                                    <TextBlock Text="{Binding Value}" Style="{StaticResource Value}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding Value}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <ItemsControl ItemsSource="{Binding Sections}" Focusable="False">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Style="{StaticResource SubCard}" Margin="0,10,0,0">
+                                                    <StackPanel>
+                                                        <Grid Margin="0,0,0,4">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="100" />
+                                                                <ColumnDefinition Width="100" />
+                                                                <ColumnDefinition Width="100" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="{Binding Title}" Style="{StaticResource H3}" FontSize="13" />
+                                                            <TextBlock Grid.Column="1" Text="{l:T sensor.col.value}" Style="{StaticResource Caption}" TextAlignment="Right" />
+                                                            <TextBlock Grid.Column="2" Text="{l:T sensor.col.min}" Style="{StaticResource Caption}" TextAlignment="Right" />
+                                                            <TextBlock Grid.Column="3" Text="{l:T sensor.col.max}" Style="{StaticResource Caption}" TextAlignment="Right" />
+                                                        </Grid>
+                                                        <ItemsControl ItemsSource="{Binding Rows}" Focusable="False">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Grid Margin="0,3">
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="*" />
+                                                                            <ColumnDefinition Width="100" />
+                                                                            <ColumnDefinition Width="100" />
+                                                                            <ColumnDefinition Width="100" />
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                                        <TextBlock Grid.Column="1" Text="{Binding Value}" TextAlignment="Right" FontWeight="SemiBold">
+                                                                            <TextBlock.Style>
+                                                                                <Style TargetType="TextBlock">
+                                                                                    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                                                                                            <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                                                                                        </DataTrigger>
+                                                                                        <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                                                                                            <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </TextBlock.Style>
+                                                                        </TextBlock>
+                                                                        <TextBlock Grid.Column="2" Text="{Binding Min}" TextAlignment="Right" Foreground="{DynamicResource TextMutedBrush}" />
+                                                                        <TextBlock Grid.Column="3" Text="{Binding Max}" TextAlignment="Right" Foreground="{DynamicResource TextMutedBrush}" />
+                                                                    </Grid>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <TextBlock Text="{l:T health.no_device_sensors}" Style="{StaticResource Caption}" Margin="0,10,0,0"
+                                               Visibility="{Binding HasSensors, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
                                 </StackPanel>
-                                <Grid Margin="0,0,0,4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="110" />
-                                        <ColumnDefinition Width="110" />
-                                        <ColumnDefinition Width="110" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="{l:T sensor.col.name}" Style="{StaticResource Caption}" />
-                                    <TextBlock Grid.Column="1" Text="{l:T sensor.col.value}" Style="{StaticResource Caption}" TextAlignment="Right" />
-                                    <TextBlock Grid.Column="2" Text="{l:T sensor.col.min}" Style="{StaticResource Caption}" TextAlignment="Right" />
-                                    <TextBlock Grid.Column="3" Text="{l:T sensor.col.max}" Style="{StaticResource Caption}" TextAlignment="Right" />
-                                </Grid>
-                                <ItemsControl ItemsSource="{Binding Rows}" Focusable="False">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="0,4">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="110" />
-                                                    <ColumnDefinition Width="110" />
-                                                    <ColumnDefinition Width="110" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Grid.Column="1" Text="{Binding Value}" TextAlignment="Right" FontWeight="SemiBold">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding Severity}" Value="Warning">
-                                                                    <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
-                                                                </DataTrigger>
-                                                                <DataTrigger Binding="{Binding Severity}" Value="Critical">
-                                                                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                                <TextBlock Grid.Column="2" Text="{Binding Min}" TextAlignment="Right" Foreground="{DynamicResource TextMutedBrush}" />
-                                                <TextBlock Grid.Column="3" Text="{Binding Max}" TextAlignment="Right" Foreground="{DynamicResource TextMutedBrush}" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
                             </StackPanel>
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <Border Style="{StaticResource Card}" Visibility="{Binding SensorGroups.Count, Converter={StaticResource EmptyToCollapsed}, ConverterParameter=invert}">
+            <Border Style="{StaticResource Card}" Visibility="{Binding Devices.Count, Converter={StaticResource EmptyToCollapsed}, ConverterParameter=invert}">
                 <TextBlock Text="{l:T health.loading_sensors}" Style="{StaticResource Body}" />
             </Border>
         </StackPanel>

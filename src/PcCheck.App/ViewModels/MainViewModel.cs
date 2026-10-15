@@ -9,6 +9,7 @@ using PcCheck.Core.Localization;
 using PcCheck.Core.Models;
 using PcCheck.Core.Reporting;
 using PcCheck.Core.Scanning;
+using PcCheck.Core.Sensors;
 using PcCheck.Core.Util;
 
 namespace PcCheck.App.ViewModels;
@@ -254,14 +255,66 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
+        if (action.Kind == FixKind.RunTool && action.Arg == SystemTools.CpuSensor && _installingCpuSensor)
+        {
+            ShowToast(Loc.T("cpu_sensor.busy"));
+            return;
+        }
+
         if (action.RequiresConfirmation)
         {
             var message = action.ConfirmMessage?.ToString() ?? Loc.T("dialog.confirm_generic");
             if (!await ConfirmAsync(action.Label.ToString(), message, Loc.T("dialog.run"))) return;
         }
 
+        if (action.Kind == FixKind.RunTool && action.Arg == SystemTools.CpuSensor)
+        {
+            await EnableCpuSensorAsync();
+            return;
+        }
+
         var outcome = await FixService.ExecuteAsync(action);
         ShowToast(outcome.Message.ToString(), !outcome.Success);
+    }
+
+    private bool _installingCpuSensor;
+
+    /// <summary>
+    /// Bật đọc nhiệt độ CPU chính xác: tải + kiểm tra chữ ký + cài PawnIO im lặng, sau đó mở lại bộ đọc cảm biến
+    /// để có nhiệt độ ngay mà không phải khởi động lại ứng dụng.
+    /// </summary>
+    private async Task EnableCpuSensorAsync()
+    {
+        if (_installingCpuSensor) return;
+        _installingCpuSensor = true;
+        try
+        {
+            var progress = new Progress<string>(stage => ShowToast(Loc.T($"cpu_sensor.stage.{stage}")));
+            var outcome = await PawnIoInstaller.InstallAsync(progress);
+            if (!outcome.Success)
+            {
+                ShowToast(outcome.Message.ToString(), true);
+                return;
+            }
+
+            ShowToast(Loc.T("cpu_sensor.stage.reading"));
+            await State.Sensors.ReopenAsync();
+            await State.RefreshLiveAsync();
+            await State.ReanalyzeAsync(data =>
+            {
+                data.Sensors = State.Live;
+                return Task.CompletedTask;
+            });
+
+            var live = State.Live;
+            ShowToast(live.HasCpuSensor
+                ? Loc.F("cpu_sensor.result.live", Format.Celsius(live.CpuTemperature, Loc.Instance.Culture))
+                : outcome.Message.ToString());
+        }
+        finally
+        {
+            _installingCpuSensor = false;
+        }
     }
 
     public async Task RunToolAsync(string toolKey, bool confirm)

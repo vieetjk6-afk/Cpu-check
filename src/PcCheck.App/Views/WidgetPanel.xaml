@@ -46,11 +46,12 @@
     <StackPanel>
         <!-- Bố cục dọc -->
         <ItemsControl ItemsSource="{Binding Metrics}" Focusable="False"
-                      Visibility="{Binding IsHorizontal, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                      Visibility="{Binding ShowFull, Converter={StaticResource BoolToVis}}">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
                     <Grid Width="236" Margin="0,5">
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -89,7 +90,46 @@
                             </Grid.Style>
                             <c:Sparkline Values="{Binding History}" Capacity="40" Stroke="{DynamicResource AccentBrush}" />
                         </Grid>
+                        <!-- Danh sách con: nhiệt độ từng thiết bị -->
+                        <ItemsControl Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Margin="6,4,0,0" ItemsSource="{Binding Lines}" Focusable="False"
+                                      Visibility="{Binding Lines, Converter={StaticResource EmptyToCollapsed}}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="18" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Style="{StaticResource SeverityIcon}" Text="{Binding Glyph}" FontSize="11" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip="{Binding Name}" />
+                                        <TextBlock Grid.Column="2" Style="{StaticResource SeverityText}" Text="{Binding Value}" FontSize="12.5" FontWeight="SemiBold"
+                                                   Margin="8,0,0,0" VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </Grid>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Bố cục dọc thu gọn: lưới biểu tượng + giá trị -->
+        <ItemsControl ItemsSource="{Binding Metrics}" Focusable="False" Width="236"
+                      Visibility="{Binding ShowCompact, Converter={StaticResource BoolToVis}}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="3" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,6,3" ToolTip="{Binding Label}">
+                        <TextBlock Style="{StaticResource SeverityIcon}" Text="{Binding Glyph}" FontSize="12" VerticalAlignment="Center" />
+                        <TextBlock Style="{StaticResource SeverityText}" Text="{Binding Value}" FontSize="12.5" FontWeight="SemiBold" Margin="6,0,0,0"
+                                   FontFamily="{StaticResource DisplayFont}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>

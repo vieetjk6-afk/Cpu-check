@@ -25,8 +25,13 @@
             <views:EmptyState Visibility="{Binding NoResult, Converter={StaticResource BoolToVis}}" Margin="0,0,0,16" />
 
             <StackPanel Visibility="{Binding HasResult, Converter={StaticResource BoolToVis}}">
-                <!-- Bộ lọc -->
-                <Border Style="{StaticResource SegmentHost}" Margin="0,0,0,14">
+                <!-- Bộ lọc + mở rộng / thu gọn tất cả -->
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource SegmentHost}" HorizontalAlignment="Left">
                     <StackPanel Orientation="Horizontal">
                         <RadioButton Style="{StaticResource SegmentButton}" GroupName="IssueFilter"
                                      IsChecked="{Binding Filter, Converter={StaticResource Equals}, ConverterParameter=all}">
@@ -46,6 +51,23 @@
                         </RadioButton>
                     </StackPanel>
                 </Border>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Style="{StaticResource GhostButton}" Command="{Binding ExpandAllCommand}" Margin="0,0,4,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE8A9;" FontSize="13" />
+                                <TextBlock Text="{l:T common.expand_all}" Margin="6,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource GhostButton}" Command="{Binding CollapseAllCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE73F;" FontSize="13" />
+                                <TextBlock Text="{l:T common.collapse_all}" Margin="6,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+                <TextBlock Text="{l:T issues.click_hint}" Style="{StaticResource Caption}" Margin="2,0,0,10"
+                           Visibility="{Binding NoIssues, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
 
                 <Border Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding NoIssues, Converter={StaticResource BoolToVis}}">
                     <StackPanel Orientation="Horizontal">

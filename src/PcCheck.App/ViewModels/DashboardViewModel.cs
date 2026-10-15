@@ -133,8 +133,12 @@ public sealed class DashboardViewModel : PageViewModel
         var cpuTemp = live.CpuTemperature;
         CpuTile.Value = Format.Percent(load, culture);
         CpuTile.Percent = load ?? 0;
-        CpuTile.Caption = cpuTemp is null ? Loc.T("dash.no_temp") : Format.Celsius(cpuTemp, culture);
+        CpuTile.Caption = cpuTemp is null ? Loc.T("dash.no_temp")
+            : live.CpuTemperatureEstimated ? Loc.F("dash.temp_estimated", Format.Celsius(cpuTemp, culture))
+            : Format.Celsius(cpuTemp, culture);
         CpuTile.Severity = Thresholds.TemperatureSeverity(cpuTemp, Thresholds.CpuTempWarn, Thresholds.CpuTempCritical);
+        // Nhiệt độ ước lượng (ACPI) không đủ tin cậy để báo đỏ.
+        if (live.CpuTemperatureEstimated && CpuTile.Severity == Severity.Critical) CpuTile.Severity = Severity.Warning;
         if (load is not null) CpuTile.History = _cpuHistory.Push(load.Value);
 
         var gpuLoad = live.GpuLoad;

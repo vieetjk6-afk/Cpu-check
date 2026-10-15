@@ -14,12 +14,26 @@
                     <TextBlock Text="{l:T page.hardware.title}" Style="{StaticResource H1}" />
                     <TextBlock Text="{l:T page.hardware.subtitle}" Style="{StaticResource Body}" Margin="0,4,0,0" />
                 </StackPanel>
-                <Button Grid.Column="1" Command="{Binding CopyCommand}" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Style="{StaticResource Icon}" Text="&#xE8C8;" FontSize="14" />
-                        <TextBlock Text="{l:T hw.copy}" Margin="8,0,0,0" />
-                    </StackPanel>
-                </Button>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource GhostButton}" Command="{Binding ExpandAllCommand}" Margin="0,0,4,0" ToolTip="{l:T common.expand_all}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE8A9;" FontSize="13" />
+                            <TextBlock Text="{l:T common.expand_all}" Margin="6,0,0,0" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource GhostButton}" Command="{Binding CollapseAllCommand}" Margin="0,0,10,0" ToolTip="{l:T common.collapse_all}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE73F;" FontSize="13" />
+                            <TextBlock Text="{l:T common.collapse_all}" Margin="6,0,0,0" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding CopyCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE8C8;" FontSize="14" />
+                            <TextBlock Text="{l:T hw.copy}" Margin="8,0,0,0" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
             </Grid>
 
             <views:EmptyState Visibility="{Binding NoResult, Converter={StaticResource BoolToVis}}" />
@@ -27,21 +41,28 @@
             <ItemsControl ItemsSource="{Binding Sections}" Focusable="False">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                        <Border Style="{StaticResource HoverCard}" Margin="0,0,0,14">
                             <StackPanel>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border Width="42" Height="42" CornerRadius="12" Background="{DynamicResource AccentSoftBrush}">
-                                        <TextBlock Style="{StaticResource Icon}" Text="{Binding Glyph}" FontSize="18" Foreground="{DynamicResource AccentBrush}" />
-                                    </Border>
-                                    <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Title}" Style="{StaticResource Caption}" FontSize="12.5" />
-                                        <TextBlock Text="{Binding Subtitle}" Style="{StaticResource H2}" TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                </Grid>
+                                <ToggleButton Style="{StaticResource ExpandHeader}" IsChecked="{Binding IsExpanded}" AutomationProperties.Name="{Binding Title}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="42" Height="42" CornerRadius="12" Background="{DynamicResource AccentSoftBrush}">
+                                            <TextBlock Style="{StaticResource Icon}" Text="{Binding Glyph}" FontSize="18" Foreground="{DynamicResource AccentBrush}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Title}" Style="{StaticResource Caption}" FontSize="12.5" />
+                                            <TextBlock Text="{Binding Subtitle}" Style="{StaticResource H2}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <Border Grid.Column="2" Width="30" Height="30" CornerRadius="8" Margin="10,0,0,0" Background="{DynamicResource CardAltBrush}">
+                                            <TextBlock Style="{StaticResource Chevron}" Tag="{Binding IsExpanded}" />
+                                        </Border>
+                                    </Grid>
+                                </ToggleButton>
+                                <StackPanel Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
                                 <ItemsControl ItemsSource="{Binding Items}" Margin="0,14,0,0" Focusable="False"
                                               Visibility="{Binding Items, Converter={StaticResource EmptyToCollapsed}}">
                                     <ItemsControl.ItemsPanel>
@@ -59,6 +80,7 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                                 <ItemsControl ItemsSource="{Binding Groups}" ItemTemplate="{StaticResource InfoGroupTemplate}" Focusable="False" />
+                                </StackPanel>
                             </StackPanel>
                         </Border>
                     </DataTemplate>

@@ -35,7 +35,17 @@ public sealed class IssuesViewModel : PageViewModel
 
     public IssuesViewModel(MainViewModel main) : base(main)
     {
+        ExpandAllCommand = new RelayCommand(() => SetAllExpanded(true), () => Issues.Any(i => i.HasGuide));
+        CollapseAllCommand = new RelayCommand(() => SetAllExpanded(false), () => Issues.Any(i => i.HasGuide));
         Rebuild();
+    }
+
+    public RelayCommand ExpandAllCommand { get; }
+    public RelayCommand CollapseAllCommand { get; }
+
+    private void SetAllExpanded(bool expanded)
+    {
+        foreach (var issue in Issues) issue.IsExpanded = expanded;
     }
 
     public IReadOnlyList<IssueItem> Issues { get => _issues; private set => Set(ref _issues, value); }

@@ -13,6 +13,7 @@ namespace PcCheck.Core.Sensors;
 public sealed class SensorService : IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly ThermalZoneReader _thermalZones = new();
     private Computer? _computer;
     private bool _openFailed;
     private bool _disposed;
@@ -93,12 +94,11 @@ public sealed class SensorService : IDisposable
     public async Task<SensorSnapshot> RefreshAsync(CancellationToken ct = default)
     {
         await EnsureOpenAsync(ct).ConfigureAwait(false);
-        if (_computer is null) return Latest = new SensorSnapshot { Available = false, PawnIoInstalled = _pawnIo };
 
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (_disposed || _computer is null) return Latest;
+            if (_disposed) return Latest;
             Latest = await Task.Run(ReadAll, ct).ConfigureAwait(false);
             return Latest;
         }
@@ -108,10 +108,58 @@ public sealed class SensorService : IDisposable
         }
     }
 
-    [MethodImpl(MethodImplOptions.NoInlining)]
+    /// <summary>
+    /// Đóng rồi mở lại bộ đọc cảm biến – dùng sau khi vừa cài driver PawnIO để đọc được nhiệt độ CPU mà không cần khởi động lại ứng dụng.
+    /// </summary>
+    public async Task ReopenAsync(CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (_disposed) return;
+            try
+            {
+                _computer?.Close();
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("Đóng LibreHardwareMonitor lỗi", ex);
+            }
+
+            _computer = null;
+            _openFailed = false;
+            await Task.Run(Open, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _openFailed = true;
+            Log.Warn("Mở lại LibreHardwareMonitor lỗi", ex);
+        }
+        finally
+        {
+            ReleaseGate();
+        }
+    }
+
     private SensorSnapshot ReadAll()
     {
         var readings = new List<SensorReading>(256);
+        if (_computer is not null) ReadHardware(readings);
+
+        // Không có cảm biến nhiệt độ CPU (chưa có driver hoặc LibreHardwareMonitor lỗi) -> dùng vùng nhiệt ACPI của Windows.
+        if (SensorSnapshot.PickCpuTemperature(readings) is null) readings.AddRange(_thermalZones.Read());
+
+        return new SensorSnapshot
+        {
+            Readings = readings,
+            PawnIoInstalled = _pawnIo,
+            Available = readings.Count > 0,
+        };
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void ReadHardware(List<SensorReading> readings)
+    {
         try
         {
             foreach (var hardware in _computer!.Hardware)
@@ -123,8 +171,6 @@ public sealed class SensorService : IDisposable
         {
             Log.Warn("Đọc cảm biến lỗi", ex);
         }
-
-        return new SensorSnapshot { Readings = readings, PawnIoInstalled = _pawnIo, Available = true };
     }
 
     private static void Collect(IHardware hardware, List<SensorReading> readings, IHardware? root = null)
@@ -191,17 +237,6 @@ public sealed class SensorService : IDisposable
         SensorType.Throughput => SensorKind.Throughput,
         _ => SensorKind.Other,
     };
-
-    /// <summary>Nhiệt độ ACPI (dự phòng khi không đọc được cảm biến CPU) – thường kém chính xác.</summary>
-    public static float? ReadAcpiTemperature()
-    {
-        var temps = Wmi.Query("SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature", Wmi.RootWmi, 5)
-            .Select(r => r.Long("CurrentTemperature"))
-            .Where(t => t is > 2732 and < 4000)
-            .Select(t => (float)((t!.Value - 2732) / 10.0))
-            .ToList();
-        return temps.Count == 0 ? null : temps.Max();
-    }
 
     private void ReleaseGate()
     {

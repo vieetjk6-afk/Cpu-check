@@ -18,6 +18,7 @@ public sealed class WidgetMetric : ObservableObject
     private double _percent;
     private Severity _severity;
     private IReadOnlyList<double>? _historyValues;
+    private IReadOnlyList<WidgetLine> _lines = [];
 
     public WidgetMetric(string key, string glyph, bool hasBar, bool hasGraph)
     {
@@ -38,10 +39,16 @@ public sealed class WidgetMetric : ObservableObject
     public Severity Severity { get => _severity; set => Set(ref _severity, value); }
     public IReadOnlyList<double>? History { get => _historyValues; private set => Set(ref _historyValues, value); }
 
+    /// <summary>Danh sách con (vd nhiệt độ từng thiết bị). Rỗng với các thông số thường.</summary>
+    public IReadOnlyList<WidgetLine> Lines { get => _lines; set => Set(ref _lines, value); }
+
     public void Push(double value) => History = _history.Push(value);
 
     public void RefreshLabel() => OnPropertyChanged(nameof(Label));
 }
+
+/// <summary>Một dòng con trong thông số widget (tên thiết bị + giá trị).</summary>
+public sealed record WidgetLine(string Glyph, string Name, string Value, Severity Severity);
 
 /// <summary>Lựa chọn thông số trong trang cài đặt widget.</summary>
 public sealed class MetricOption : ObservableObject
@@ -95,6 +102,7 @@ public sealed class WidgetViewModel : PageViewModel
         ("net", "", false, true),
         ("disk", "", true, true),
         ("disk_temp", "", true, false),
+        ("devices", "", false, false),
         ("fans", "", false, false),
         ("battery", "", true, false),
         ("uptime", "", false, false),
@@ -118,6 +126,7 @@ public sealed class WidgetViewModel : PageViewModel
 
         RebuildVisible();
         ToggleCommand = new RelayCommand(() => IsVisible = !IsVisible);
+        ToggleCollapsedCommand = new RelayCommand(() => Collapsed = !Collapsed);
         HideCommand = new RelayCommand(() => IsVisible = false);
         ResetPositionCommand = new RelayCommand(() =>
         {
@@ -152,6 +161,7 @@ public sealed class WidgetViewModel : PageViewModel
     public ObservableCollection<MetricOption> Options { get; } = [];
 
     public RelayCommand ToggleCommand { get; }
+    public RelayCommand ToggleCollapsedCommand { get; }
     public RelayCommand HideCommand { get; }
     public RelayCommand ResetPositionCommand { get; }
     public RelayCommand ResetMetricsCommand { get; }
@@ -189,6 +199,29 @@ public sealed class WidgetViewModel : PageViewModel
         set => Update(() => Store.ShowGraphs = value);
     }
 
+    /// <summary>Thu gọn widget: chỉ còn lưới biểu tượng + giá trị.</summary>
+    public bool Collapsed
+    {
+        get => Store.Collapsed;
+        set
+        {
+            Update(() => Store.Collapsed = value);
+            OnLayoutChanged();
+        }
+    }
+
+    /// <summary>Bố cục dọc đầy đủ.</summary>
+    public bool ShowFull => !IsHorizontal && !Collapsed;
+
+    /// <summary>Bố cục dọc thu gọn.</summary>
+    public bool ShowCompact => !IsHorizontal && Collapsed;
+
+    private void OnLayoutChanged()
+    {
+        OnPropertyChanged(nameof(ShowFull));
+        OnPropertyChanged(nameof(ShowCompact));
+    }
+
     /// <summary>Độ đục dạng chuỗi phần trăm để bind với nút phân đoạn: "100", "90", "75", "60".</summary>
     public string OpacityPercent
     {
@@ -224,6 +257,7 @@ public sealed class WidgetViewModel : PageViewModel
             Update(() => Store.Layout = value == "horizontal" ? "horizontal" : "vertical");
             OnPropertyChanged(nameof(Layout));
             OnPropertyChanged(nameof(IsHorizontal));
+            OnLayoutChanged();
         }
     }
 
@@ -344,7 +378,10 @@ public sealed class WidgetViewModel : PageViewModel
             {
                 var t = live.CpuTemperature;
                 SetTemperature(m, t, Thresholds.CpuTempWarn, Thresholds.CpuTempCritical, c);
-                m.Detail = live.CpuPower is { } w ? w.ToString("0", c) + " W" : t is null ? Loc.T("widget.no_sensor") : "";
+                if (live.CpuTemperatureEstimated && m.Severity == Severity.Critical) m.Severity = Severity.Warning;
+                m.Detail = live.CpuTemperatureEstimated ? Loc.T("health.estimated")
+                    : live.CpuPower is { } w ? w.ToString("0", c) + " W"
+                    : t is null ? Loc.T("widget.no_sensor") : "";
                 break;
             }
 
@@ -419,6 +456,24 @@ public sealed class WidgetViewModel : PageViewModel
                 m.Detail = "";
                 break;
 
+            case "devices":
+            {
+                var devices = live.DeviceTemperatures();
+                var lines = devices.Select(d =>
+                {
+                    var (warn, critical) = TemperatureLimits(d.Kind);
+                    var severity = Thresholds.TemperatureSeverity(d.Celsius, warn, critical);
+                    if (d.Estimated && severity == Severity.Critical) severity = Severity.Warning;
+                    var value = Format.Celsius(d.Celsius, c) + (d.Estimated ? "*" : "");
+                    return new WidgetLine(DeviceGlyph(d.Kind), ShortName(d.Name), value, severity);
+                }).ToList();
+                m.Lines = lines;
+                m.Value = devices.Count == 0 ? "—" : Format.Celsius(devices.Max(d => d.Celsius), c);
+                m.Severity = lines.Count == 0 ? Severity.Ok : lines.Max(l => l.Severity);
+                m.Detail = devices.Count == 0 ? Loc.T("widget.no_sensor") : devices.Any(d => d.Estimated) ? Loc.T("widget.estimated_note") : "";
+                break;
+            }
+
             case "fans":
                 m.Value = live.MaxFanRpm is { } rpm ? rpm.ToString("0", c) + " RPM" : "—";
                 m.Detail = Loc.F("health.fans_count", live.FanCount);
@@ -448,6 +503,36 @@ public sealed class WidgetViewModel : PageViewModel
                 m.Severity = Severity.Ok;
                 break;
         }
+    }
+
+    private static (double Warn, double Critical) TemperatureLimits(SensorHardwareKind kind) => kind switch
+    {
+        SensorHardwareKind.Cpu => (Thresholds.CpuTempWarn, Thresholds.CpuTempCritical),
+        SensorHardwareKind.Gpu => (Thresholds.GpuTempWarn, Thresholds.GpuTempCritical),
+        SensorHardwareKind.Storage => (Thresholds.SsdTempWarn, Thresholds.SsdTempCritical),
+        _ => (80, 95),
+    };
+
+    private static string DeviceGlyph(SensorHardwareKind kind) => kind switch
+    {
+        SensorHardwareKind.Cpu => "\uE950",
+        SensorHardwareKind.Gpu => "\uE7F4",
+        SensorHardwareKind.Storage => "\uEDA2",
+        SensorHardwareKind.Battery => "\uE83F",
+        _ => "\uE964",
+    };
+
+    /// <summary>Rút gọn tên thiết bị cho vừa widget: bỏ hãng / chữ thừa, tối đa ~22 ký tự.</summary>
+    internal static string ShortName(string name)
+    {
+        var text = name;
+        foreach (var noise in new[] { "(R)", "(TM)", "®", "™", "Intel ", "AMD ", "NVIDIA ", "GeForce ", "Radeon ", "Samsung SSD ", "CPU ", "Processor" })
+            text = text.Replace(noise, " ", StringComparison.OrdinalIgnoreCase);
+        var at = text.IndexOf('@');
+        if (at > 0) text = text[..at];
+        text = string.Join(' ', text.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        if (text.Length == 0) text = name;
+        return text.Length <= 22 ? text : text[..21].TrimEnd() + "…";
     }
 
     private static void SetTemperature(WidgetMetric m, float? value, double warn, double critical, CultureInfo c)

@@ -11,16 +11,26 @@ namespace PcCheck.App.ViewModels;
 /// <summary>Trang thông tin phần cứng chi tiết.</summary>
 public sealed class HardwareViewModel : PageViewModel
 {
+    private readonly Dictionary<string, bool> _expanded = new(StringComparer.Ordinal);
     private IReadOnlyList<InfoSection> _sections = [];
 
     public HardwareViewModel(MainViewModel main) : base(main)
     {
         CopyCommand = new RelayCommand(Copy, () => Sections.Count > 0);
+        ExpandAllCommand = new RelayCommand(() => SetAllExpanded(true), () => Sections.Count > 0);
+        CollapseAllCommand = new RelayCommand(() => SetAllExpanded(false), () => Sections.Count > 0);
     }
 
     public IReadOnlyList<InfoSection> Sections { get => _sections; private set => Set(ref _sections, value); }
 
     public RelayCommand CopyCommand { get; }
+    public RelayCommand ExpandAllCommand { get; }
+    public RelayCommand CollapseAllCommand { get; }
+
+    private void SetAllExpanded(bool expanded)
+    {
+        foreach (var section in Sections) section.IsExpanded = expanded;
+    }
 
     protected override void Rebuild()
     {
@@ -35,7 +45,7 @@ public sealed class HardwareViewModel : PageViewModel
         var sections = new List<InfoSection>();
 
         // Hệ thống
-        sections.Add(new InfoSection("", Loc.T("hw.section.system"), $"{hw.Computer.Manufacturer} {hw.Computer.Model}".Trim(),
+        sections.Add(new InfoSection("", "hw.section.system", $"{hw.Computer.Manufacturer} {hw.Computer.Model}".Trim(),
         [
             new(Loc.T("hw.os"), $"{hw.Os.Caption} {hw.Os.DisplayVersion}".Trim()),
             new(Loc.T("hw.build"), $"{hw.Os.Build}.{hw.Os.Revision} ({(hw.Os.Is64Bit ? "64-bit" : "32-bit")})"),
@@ -50,7 +60,7 @@ public sealed class HardwareViewModel : PageViewModel
         // CPU
         foreach (var cpu in hw.Cpus)
         {
-            sections.Add(new InfoSection("", Loc.T("hw.cpu"), cpu.Name,
+            sections.Add(new InfoSection("", "hw.cpu", cpu.Name,
             [
                 new(Loc.T("hw.cpu.vendor"), cpu.Manufacturer),
                 new(Loc.T("hw.cpu.cores"), Loc.F("hw.cpu.cores_value", cpu.Cores, cpu.Threads)),
@@ -63,7 +73,7 @@ public sealed class HardwareViewModel : PageViewModel
         }
 
         // Mainboard
-        sections.Add(new InfoSection("", Loc.T("hw.mainboard"), $"{hw.Board.Manufacturer} {hw.Board.Product}".Trim(),
+        sections.Add(new InfoSection("", "hw.mainboard", $"{hw.Board.Manufacturer} {hw.Board.Product}".Trim(),
         [
             new(Loc.T("hw.board.vendor"), Format.OrDash(hw.Board.Manufacturer)),
             new(Loc.T("hw.board.model"), Format.OrDash(hw.Board.Product)),
@@ -81,7 +91,7 @@ public sealed class HardwareViewModel : PageViewModel
                 new(Loc.T("ram.part"), Format.OrDash(m.PartNumber)),
                 new(Loc.T("ram.bank"), Format.OrDash(m.Bank)),
             ])).ToList();
-        sections.Add(new InfoSection("", Loc.T("hw.ram"), Format.Bytes(hw.Memory.InstalledBytes, c),
+        sections.Add(new InfoSection("", "hw.ram", Format.Bytes(hw.Memory.InstalledBytes, c),
         [
             new(Loc.T("hw.ram.usable"), Format.Bytes(hw.Memory.TotalBytes, c)),
             new(Loc.T("hw.ram.slots"), hw.Memory.SlotCount > 0 ? Loc.F("hw.ram.slots_value", hw.Memory.Modules.Count, hw.Memory.SlotCount) : hw.Memory.Modules.Count.ToString(c)),
@@ -100,7 +110,7 @@ public sealed class HardwareViewModel : PageViewModel
             ],
             g.IsBasicDriver || g.ErrorCode != 0 ? Severity.Critical : Severity.Ok,
             g.IsBasicDriver ? Loc.T("driver.kind.missing") : g.ErrorCode != 0 ? $"Code {g.ErrorCode}" : Loc.T("common.ok"))).ToList();
-        sections.Add(new InfoSection("", Loc.T("hw.gpu"), Loc.F("hw.count", gpuGroups.Count), [], gpuGroups));
+        sections.Add(new InfoSection("", "hw.gpu", Loc.F("hw.count", gpuGroups.Count), [], gpuGroups));
 
         // Ổ cứng
         var diskGroups = hw.Disks.Select(d => new InfoGroup(
@@ -120,7 +130,7 @@ public sealed class HardwareViewModel : PageViewModel
         var volumes = hw.Volumes.Select(v => new InfoItem(
             $"{v.Letter} {v.Label}".Trim(),
             Loc.F("volume.usage", Format.Bytes(v.FreeBytes, c), Format.Bytes(v.TotalBytes, c), v.FileSystem))).ToList();
-        sections.Add(new InfoSection("", Loc.T("hw.storage"), Loc.F("hw.count", diskGroups.Count), volumes, diskGroups));
+        sections.Add(new InfoSection("", "hw.storage", Loc.F("hw.count", diskGroups.Count), volumes, diskGroups));
 
         // Màn hình
         if (hw.Monitors.Count > 0)
@@ -133,7 +143,7 @@ public sealed class HardwareViewModel : PageViewModel
                     new(Loc.T("monitor.max_refresh"), m.MaxRefreshAtCurrent > 0 ? $"{m.MaxRefreshAtCurrent} Hz" : "—"),
                     new(Loc.T("monitor.max_resolution"), m.MaxWidth > 0 ? $"{m.MaxWidth}×{m.MaxHeight}" : "—"),
                 ])).ToList();
-            sections.Add(new InfoSection("", Loc.T("hw.monitors"), Loc.F("hw.count", monitorGroups.Count), [], monitorGroups));
+            sections.Add(new InfoSection("", "hw.monitors", Loc.F("hw.count", monitorGroups.Count), [], monitorGroups));
         }
 
         // Mạng
@@ -148,20 +158,20 @@ public sealed class HardwareViewModel : PageViewModel
                 ],
                 n.Connected ? Severity.Ok : Severity.Info,
                 n.Connected ? Loc.T("net.connected") : Loc.T("net.disconnected"))).ToList();
-            sections.Add(new InfoSection("", Loc.T("hw.network"), Loc.F("hw.count", netGroups.Count), [], netGroups));
+            sections.Add(new InfoSection("", "hw.network", Loc.F("hw.count", netGroups.Count), [], netGroups));
         }
 
         // Âm thanh
         if (hw.AudioDevices.Count > 0)
         {
-            sections.Add(new InfoSection("", Loc.T("hw.audio"), Loc.F("hw.count", hw.AudioDevices.Count),
+            sections.Add(new InfoSection("", "hw.audio", Loc.F("hw.count", hw.AudioDevices.Count),
                 hw.AudioDevices.Select(a => new InfoItem(a.Name, $"{a.Manufacturer} · {a.Status}")).ToList()));
         }
 
         // Pin
         if (hw.Battery is { } battery)
         {
-            sections.Add(new InfoSection("", Loc.T("hw.battery"), Format.OrDash(battery.Name),
+            sections.Add(new InfoSection("", "hw.battery", Format.OrDash(battery.Name),
             [
                 new(Loc.T("battery.charge"), Format.Percent(battery.ChargePercent, c) + (battery.IsCharging == true ? " · " + Loc.T("battery.charging") : "")),
                 new(Loc.T("battery.design"), battery.DesignCapacity > 0 ? battery.DesignCapacity.ToString("N0", c) + " mWh" : "—"),
@@ -169,6 +179,13 @@ public sealed class HardwareViewModel : PageViewModel
                 new(Loc.T("battery.wear"), Format.Percent(battery.WearPercent, c)),
                 new(Loc.T("battery.cycles"), battery.CycleCount?.ToString(c) ?? "—"),
             ]));
+        }
+
+        // Giữ trạng thái thu gọn của từng mục khi dựng lại (quét lại / đổi ngôn ngữ).
+        foreach (var section in Sections) _expanded[section.Key] = section.IsExpanded;
+        foreach (var section in sections)
+        {
+            if (_expanded.TryGetValue(section.Key, out var expanded)) section.IsExpanded = expanded;
         }
 
         Sections = sections;

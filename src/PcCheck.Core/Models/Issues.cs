@@ -53,7 +53,13 @@ public sealed class Issue
     public required LocText Detail { get; init; }
     public LocText? Recommendation { get; init; }
     public IReadOnlyList<FixAction> Fixes { get; init; } = [];
+
+    /// <summary>Hướng dẫn chi tiết (nguyên nhân + các bước xử lý), gắn theo loại vấn đề.</summary>
+    public IssueGuide? Guide { get; set; }
 }
+
+/// <summary>Nguyên nhân thường gặp và các bước khắc phục (mỗi bước một dòng trong chuỗi Steps).</summary>
+public sealed record IssueGuide(string Key, LocText Cause, LocText Steps);
 
 public enum CheckStatus
 {

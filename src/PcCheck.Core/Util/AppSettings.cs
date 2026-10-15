@@ -72,7 +72,7 @@ public sealed class WidgetSettings
 {
     /// <summary>Tất cả thông số widget hỗ trợ (giao diện hiển thị theo thứ tự này).</summary>
     public static readonly IReadOnlyList<string> AllMetrics =
-        ["cpu", "cpu_temp", "gpu", "gpu_temp", "vram", "ram", "net", "disk", "disk_temp", "fans", "battery", "uptime", "clock"];
+        ["cpu", "cpu_temp", "gpu", "gpu_temp", "vram", "ram", "net", "disk", "disk_temp", "devices", "fans", "battery", "uptime", "clock"];
 
     public static readonly IReadOnlyList<string> DefaultMetrics = ["cpu", "cpu_temp", "gpu", "gpu_temp", "ram", "net", "disk"];
 
@@ -80,6 +80,9 @@ public sealed class WidgetSettings
     public bool AlwaysOnTop { get; set; } = true;
     public bool Locked { get; set; }
     public bool ShowGraphs { get; set; } = true;
+
+    /// <summary>Thu gọn widget thành lưới nhỏ chỉ có biểu tượng + giá trị.</summary>
+    public bool Collapsed { get; set; }
 
     /// <summary>Độ đục 0.4 – 1.0.</summary>
     public double Opacity { get; set; } = 0.95;

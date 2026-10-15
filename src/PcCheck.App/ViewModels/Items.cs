@@ -12,9 +12,16 @@ public sealed class FixItem(FixAction action)
     public string Label { get; } = action.Label.ToString();
 }
 
-/// <summary>Một vấn đề đã dịch sẵn sang ngôn ngữ hiện tại.</summary>
-public sealed class IssueItem
+/// <summary>Một bước trong hướng dẫn khắc phục (đánh số).</summary>
+public sealed record StepItem(int Number, string Text);
+
+/// <summary>Một vấn đề đã dịch sẵn sang ngôn ngữ hiện tại. Bấm vào thẻ để xem nguyên nhân và các bước khắc phục.</summary>
+public sealed class IssueItem : ObservableObject
 {
+    // Giữ trạng thái mở rộng khi danh sách được dựng lại (đổi ngôn ngữ, quét lại, đổi bộ lọc).
+    private static readonly HashSet<string> Expanded = new(StringComparer.Ordinal);
+    private bool _isExpanded;
+
     public IssueItem(Issue issue)
     {
         Issue = issue;
@@ -25,6 +32,16 @@ public sealed class IssueItem
         Category = Labels.Category(issue.Category);
         SeverityText = Labels.Severity(issue.Severity);
         Fixes = issue.Fixes.Select(f => new FixItem(f)).ToList();
+        if (issue.Guide is { } guide)
+        {
+            Cause = guide.Cause.ToString();
+            Steps = guide.Steps.ToString()
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select((text, i) => new StepItem(i + 1, text))
+                .ToList();
+        }
+
+        _isExpanded = HasGuide && Expanded.Contains(issue.Id);
     }
 
     public Issue Issue { get; }
@@ -35,6 +52,20 @@ public sealed class IssueItem
     public string Category { get; }
     public string SeverityText { get; }
     public IReadOnlyList<FixItem> Fixes { get; }
+    public string Cause { get; } = "";
+    public IReadOnlyList<StepItem> Steps { get; } = [];
+    public bool HasGuide => Steps.Count > 0 || Cause.Length > 0;
+
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set
+        {
+            if (!Set(ref _isExpanded, value && HasGuide)) return;
+            if (_isExpanded) Expanded.Add(Issue.Id);
+            else Expanded.Remove(Issue.Id);
+        }
+    }
 }
 
 /// <summary>Cặp nhãn - giá trị trong thẻ thông tin.</summary>
@@ -50,14 +81,25 @@ public sealed class InfoGroup(string title, string subtitle, IReadOnlyList<InfoI
     public string StatusText { get; } = statusText;
 }
 
-/// <summary>Thẻ thông tin của một linh kiện.</summary>
-public sealed class InfoSection(string glyph, string title, string subtitle, IReadOnlyList<InfoItem> items, IReadOnlyList<InfoGroup>? groups = null)
+/// <summary>Thẻ thông tin của một linh kiện (bấm tiêu đề để thu gọn / mở rộng).</summary>
+public sealed class InfoSection(string glyph, string titleKey, string subtitle, IReadOnlyList<InfoItem> items, IReadOnlyList<InfoGroup>? groups = null)
+    : ObservableObject
 {
+    private bool _isExpanded = true;
+
     public string Glyph { get; } = glyph;
-    public string Title { get; } = title;
+    public string Title { get; } = Loc.T(titleKey);
     public string Subtitle { get; } = subtitle;
     public IReadOnlyList<InfoItem> Items { get; } = items;
     public IReadOnlyList<InfoGroup> Groups { get; } = groups ?? [];
+
+    /// <summary>Khóa ổn định (khóa ngôn ngữ của tiêu đề) để nhớ trạng thái thu gọn.</summary>
+    public string Key { get; } = titleKey;
+
+    /// <summary>Tóm tắt số mục khi đang thu gọn.</summary>
+    public int Count => Items.Count + Groups.Count;
+
+    public bool IsExpanded { get => _isExpanded; set => Set(ref _isExpanded, value); }
 }
 
 /// <summary>Ô số liệu nhỏ có màu trạng thái.</summary>
