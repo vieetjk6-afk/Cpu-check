@@ -156,7 +156,9 @@ public sealed class MainViewModel : ObservableObject
         get => _isScanning;
         private set
         {
-            if (Set(ref _isScanning, value)) OnPropertyChanged(nameof(LastScanText));
+            if (!Set(ref _isScanning, value)) return;
+            OnPropertyChanged(nameof(LastScanText));
+            System.Windows.Input.CommandManager.InvalidateRequerySuggested();
         }
     }
 
@@ -380,6 +382,7 @@ public sealed class MainViewModel : ObservableObject
         issuesNav.Badge = result.Issues.Count(i => i.Severity >= Severity.Warning);
         issuesNav.BadgeSeverity = result.Issues.Count == 0 ? Severity.Ok : result.Issues.Max(i => i.Severity);
         OnPropertyChanged(nameof(LastScanText));
+        System.Windows.Input.CommandManager.InvalidateRequerySuggested();
     }
 
     public static void RunOnUi(Action action)
