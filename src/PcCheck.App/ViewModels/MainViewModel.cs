@@ -408,6 +408,19 @@ public sealed class MainViewModel : ObservableObject
     private string _activityText = "";
     private bool _checkingDisk;
 
+    /// <summary>Tác vụ đang chạy dở (gỡ phần mềm, quét virus, kiểm tra ổ) – hỏi lại trước khi thoát. Rỗng nếu không có.</summary>
+    public string RunningWorkText
+    {
+        get
+        {
+            var work = new List<string>();
+            if (Cleanup.Session?.IsBusy == true) work.Add(Loc.T("exit.work.uninstall"));
+            if (Security.IsDefenderScanning) work.Add(Loc.T("exit.work.scan"));
+            if (_checkingDisk) work.Add(Loc.T("exit.work.disk"));
+            return string.Join(", ", work);
+        }
+    }
+
     /// <summary>Dòng trạng thái ở thanh bên khi có tác vụ dài đang chạy.</summary>
     public string ActivityText { get => _activityText; set => Set(ref _activityText, value); }
 

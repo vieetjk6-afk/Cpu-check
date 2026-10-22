@@ -141,8 +141,8 @@ public enum UninstallPhase
 public sealed class UninstallSessionViewModel : ObservableObject
 {
     private readonly MainViewModel _main;
-    private readonly CancellationTokenSource _session = new();
     private CancellationTokenSource? _wait;
+    private bool _stopRequested;
     private UninstallPhase _phase;
     private string _resultText = "";
     private string _backupFolder = "";
@@ -152,8 +152,10 @@ public sealed class UninstallSessionViewModel : ObservableObject
     {
         _main = main;
         foreach (var program in programs) Steps.Add(new UninstallStep(program));
-        SkipWaitCommand = new RelayCommand(() => _wait?.Cancel(), () => Steps.Any(s => s.IsActive));
-        StopCommand = new RelayCommand(() => _session.Cancel(), () => Phase == UninstallPhase.Uninstalling && !_session.IsCancellationRequested);
+        // "Thôi chờ" chỉ có khi trình gỡ đã đóng mà phần mềm chưa biến mất – không bao giờ bỏ dở một trình gỡ đang mở
+        // (nếu không trình gỡ tiếp theo sẽ chạy song song, MSI báo lỗi 1618).
+        SkipWaitCommand = new RelayCommand(() => _wait?.Cancel(), () => Steps.Any(s => s.Status == UninstallStepStatus.Waiting));
+        StopCommand = new RelayCommand(Stop, () => Phase == UninstallPhase.Uninstalling && !_stopRequested);
         RemoveCommand = new AsyncRelayCommand(RemoveAsync, () => Phase == UninstallPhase.Leftovers && SelectedCount > 0);
         SkipLeftoversCommand = new RelayCommand(() => Finish(Loc.T("uninstall.leftovers_kept")), () => Phase == UninstallPhase.Leftovers);
         SelectAllCommand = new RelayCommand(() => SetAll(true));
@@ -227,7 +229,7 @@ public sealed class UninstallSessionViewModel : ObservableObject
 
             foreach (var step in Steps)
             {
-                if (_session.IsCancellationRequested)
+                if (_stopRequested)
                 {
                     step.Status = UninstallStepStatus.Skipped;
                     continue;
@@ -236,15 +238,21 @@ public sealed class UninstallSessionViewModel : ObservableObject
                 OnPropertyChanged(nameof(Title));
                 ProgressText = Loc.F("uninstall.progress", step.Name);
                 step.Status = UninstallStepStatus.Running;
-                _wait = CancellationTokenSource.CreateLinkedTokenSource(_session.Token);
+                var wait = new CancellationTokenSource();
+                _wait = wait;
                 var stage = new Progress<string>(s =>
                 {
-                    if (s == "waiting" && step.Status == UninstallStepStatus.Running) step.Status = UninstallStepStatus.Waiting;
+                    if (s == "waiting" && step.Status == UninstallStepStatus.Running)
+                    {
+                        step.Status = UninstallStepStatus.Waiting;
+                        if (_stopRequested) wait.Cancel(); // đã bấm Dừng khi trình gỡ còn mở: không chờ thêm
+                    }
+
                     System.Windows.Input.CommandManager.InvalidateRequerySuggested();
                 });
                 try
                 {
-                    var result = await Uninstaller.RunAsync(step.Program, quiet, stage, _wait.Token);
+                    var result = await Uninstaller.RunAsync(step.Program, quiet, stage, wait.Token);
                     step.Status = result switch
                     {
                         UninstallResult.Removed => UninstallStepStatus.Removed,
@@ -259,8 +267,8 @@ public sealed class UninstallSessionViewModel : ObservableObject
                 }
                 finally
                 {
-                    _wait.Dispose();
                     _wait = null;
+                    wait.Dispose();
                 }
 
                 System.Windows.Input.CommandManager.InvalidateRequerySuggested();
@@ -275,8 +283,22 @@ public sealed class UninstallSessionViewModel : ObservableObject
         }
     }
 
+    /// <summary>Dừng sau phần mềm hiện tại: trình gỡ đang mở vẫn được chạy tới khi xong.</summary>
+    private void Stop()
+    {
+        _stopRequested = true;
+        if (Steps.Any(s => s.Status == UninstallStepStatus.Waiting)) _wait?.Cancel();
+        System.Windows.Input.CommandManager.InvalidateRequerySuggested();
+    }
+
     private async Task ScanLeftoversAsync()
     {
+        // Phần mềm "chưa gỡ" lúc trước có thể đã gỡ xong sau đó (trình gỡ chạy tiếp ở tiến trình con) – kiểm tra lại.
+        foreach (var step in Steps.Where(s => s.Status == UninstallStepStatus.StillInstalled))
+        {
+            if (!Uninstaller.IsInstalled(step.Program)) step.Status = UninstallStepStatus.Removed;
+        }
+
         var removed = Steps.Where(s => s.Status == UninstallStepStatus.Removed && s.Program.Scope != ProgramScope.Store).ToList();
         if (removed.Count == 0)
         {
@@ -317,7 +339,7 @@ public sealed class UninstallSessionViewModel : ObservableObject
         try
         {
             var progress = new Progress<string>(path => ProgressText = Loc.F("uninstall.removing", path));
-            var result = await LeftoverRemover.RemoveAsync(selected, progress);
+            var result = await Task.Run(() => LeftoverRemover.RemoveAsync(selected, progress));
             BackupFolder = result.BackupFolder;
             Finish(result.Failed > 0
                 ? Loc.F("uninstall.removed_some", result.Removed, Format.Bytes(result.FreedBytes), result.Failed)

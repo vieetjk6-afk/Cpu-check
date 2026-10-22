@@ -185,7 +185,7 @@ public static class FixService
     {
         var safe = description.Replace("'", "", StringComparison.Ordinal);
         return await RunHiddenAsync("powershell.exe",
-            $"-NoProfile -ExecutionPolicy Bypass -Command \"Checkpoint-Computer -Description '{safe}' -RestorePointType 'APPLICATION_UNINSTALL'\"", ct).ConfigureAwait(false) == 0;
+            $"-NoProfile -ExecutionPolicy Bypass -Command \"$ErrorActionPreference='Stop'; Checkpoint-Computer -Description '{safe}' -RestorePointType 'APPLICATION_UNINSTALL' -WarningAction Stop\"", ct).ConfigureAwait(false) == 0;
     }
 
     /// <summary>Tắt một tác vụ hẹn giờ (đường dẫn dạng \Thư mục\Tên).</summary>

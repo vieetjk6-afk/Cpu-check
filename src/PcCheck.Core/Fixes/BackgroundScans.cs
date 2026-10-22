@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using PcCheck.Core.Localization;
 using PcCheck.Core.Util;
@@ -10,8 +11,10 @@ public sealed record ProcessOutput(int ExitCode, string Output, bool Cancelled);
 /// <summary>Chạy tiến trình ẩn, đọc đầu ra; hủy = dừng tiến trình.</summary>
 internal static class HiddenProcess
 {
-    public static async Task<ProcessOutput> RunAsync(string file, string args, CancellationToken ct, Func<Task>? onCancel = null)
+    /// <param name="oem">Đầu ra theo bảng mã OEM của bảng điều khiển (chkdsk, powershell) thay vì UTF-8 – cần để đọc đúng tiếng Việt.</param>
+    public static async Task<ProcessOutput> RunAsync(string file, string args, CancellationToken ct, Func<Task>? onCancel = null, bool oem = false)
     {
+        var encoding = oem ? OemEncoding() : Encoding.UTF8;
         using var process = new Process
         {
             StartInfo = new ProcessStartInfo(file, args)
@@ -20,7 +23,8 @@ internal static class HiddenProcess
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                StandardOutputEncoding = Encoding.UTF8,
+                StandardOutputEncoding = encoding,
+                StandardErrorEncoding = encoding,
             },
         };
         var output = new StringBuilder();
@@ -58,6 +62,24 @@ internal static class HiddenProcess
         process.WaitForExit(); // chờ đọc hết đầu ra
         lock (output) return new ProcessOutput(process.ExitCode, output.ToString(), false);
     }
+
+    private static Encoding OemEncoding()
+    {
+        try
+        {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            return Encoding.GetEncoding((int)GetOEMCP());
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or EntryPointNotFoundException or DllNotFoundException)
+        {
+            return Encoding.UTF8;
+        }
+    }
+
+#pragma warning disable SYSLIB1054
+    [DllImport("kernel32.dll")]
+    private static extern uint GetOEMCP();
+#pragma warning restore SYSLIB1054
 }
 
 public enum DefenderScanType
@@ -66,7 +88,17 @@ public enum DefenderScanType
     Full = 2,
 }
 
-public sealed record DefenderScanResult(bool Started, bool Completed, bool Cancelled, IReadOnlyList<string> Threats, TimeSpan Duration);
+/// <param name="Failed">MpCmdRun báo lỗi (vd Defender bị phần mềm diệt virus khác thay thế) – không được coi là "sạch".</param>
+/// <param name="ThreatsReported">MpCmdRun trả mã 2 (có mối đe dọa), kể cả khi không đọc được tên.</param>
+public sealed record DefenderScanResult(
+    bool Started,
+    bool Completed,
+    bool Cancelled,
+    IReadOnlyList<string> Threats,
+    TimeSpan Duration,
+    bool Failed = false,
+    int ExitCode = 0,
+    bool ThreatsReported = false);
 
 /// <summary>
 /// Quét bằng Microsoft Defender ngay trong ứng dụng (MpCmdRun chạy ẩn). Cửa sổ dòng lệnh của MpCmdRun không hiện tiến độ –
@@ -86,8 +118,18 @@ public static class DefenderScanner
         Log.Info($"Defender scan {type}: exit {result.ExitCode}, cancelled={result.Cancelled}, {watch.Elapsed}\n{result.Output.Trim()}");
         if (result.Cancelled) return new DefenderScanResult(true, false, true, [], watch.Elapsed);
 
-        return new DefenderScanResult(true, true, false, await Task.Run(() => ThreatsSince(start.AddMinutes(-1)), CancellationToken.None).ConfigureAwait(false), watch.Elapsed);
+        var threats = await Task.Run(() => ThreatsSince(start.AddMinutes(-1)), CancellationToken.None).ConfigureAwait(false);
+        return Interpret(result.ExitCode, threats, watch.Elapsed);
     }
+
+    /// <summary>Mã thoát MpCmdRun -Scan: 0 không có mối đe dọa, 2 có mối đe dọa, khác = quét không chạy được.</summary>
+    internal static DefenderScanResult Interpret(int exitCode, IReadOnlyList<string> threats, TimeSpan duration) => exitCode switch
+    {
+        0 => new DefenderScanResult(true, true, false, threats, duration, ThreatsReported: threats.Count > 0),
+        2 => new DefenderScanResult(true, true, false, threats, duration, ExitCode: 2, ThreatsReported: true),
+        _ when threats.Count > 0 => new DefenderScanResult(true, true, false, threats, duration, ExitCode: exitCode, ThreatsReported: true),
+        _ => new DefenderScanResult(true, false, false, [], duration, Failed: true, ExitCode: exitCode),
+    };
 
     /// <summary>Tên mối đe dọa Defender phát hiện từ thời điểm cho trước.</summary>
     private static List<string> ThreatsSince(DateTime since)
@@ -133,7 +175,7 @@ public static class DiskChecker
     {
         var letter = Normalize(drive);
         var ps = await HiddenProcess.RunAsync("powershell.exe",
-            $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$ErrorActionPreference='Stop'; (Repair-Volume -DriveLetter {letter} -Scan).ToString()\"", ct).ConfigureAwait(false);
+            $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$ErrorActionPreference='Stop'; (Repair-Volume -DriveLetter {letter} -Scan).ToString()\"", ct, oem: true).ConfigureAwait(false);
         Log.Info($"Repair-Volume -Scan {letter}: exit {ps.ExitCode}\n{ps.Output.Trim()}");
         if (ps.Cancelled) return new DiskCheckResult(DiskCheckStatus.Failed, letter, "cancelled");
 
@@ -141,7 +183,7 @@ public static class DiskChecker
         if (ps.ExitCode == 0 && parsed is not null) return new DiskCheckResult(parsed.Value, letter, ps.Output.Trim());
 
         // Dự phòng: chkdsk /scan (quét trực tuyến, không cần khởi động lại).
-        var chk = await HiddenProcess.RunAsync("chkdsk.exe", $"{letter}: /scan", ct).ConfigureAwait(false);
+        var chk = await HiddenProcess.RunAsync("chkdsk.exe", $"{letter}: /scan", ct, oem: true).ConfigureAwait(false);
         Log.Info($"chkdsk {letter}: /scan: exit {chk.ExitCode}\n{chk.Output.Trim()}");
         if (chk.Cancelled) return new DiskCheckResult(DiskCheckStatus.Failed, letter, "cancelled");
         return new DiskCheckResult(ParseChkdsk(chk.ExitCode, chk.Output), letter, chk.Output.Trim());
@@ -163,6 +205,7 @@ public static class DiskChecker
     internal static DiskCheckStatus ParseChkdsk(int exitCode, string output)
     {
         if (exitCode == 0) return DiskCheckStatus.Healthy;
+        output = output.Normalize(NormalizationForm.FormC); // bảng mã OEM tiếng Việt (1258) tách dấu thành ký tự tổ hợp
         var denied = output.Contains("Access", StringComparison.OrdinalIgnoreCase) && output.Contains("denied", StringComparison.OrdinalIgnoreCase)
                      || output.Contains("từ chối", StringComparison.OrdinalIgnoreCase)
                      || output.Contains("Cannot open volume", StringComparison.OrdinalIgnoreCase);

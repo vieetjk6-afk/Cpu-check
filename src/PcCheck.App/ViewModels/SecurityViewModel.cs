@@ -234,10 +234,18 @@ public sealed class SecurityViewModel : PageViewModel
                 LastScanSeverity = Severity.Info;
                 LastScanResult = Loc.F("sec.scan.cancelled", minutes);
             }
-            else if (result.Threats.Count > 0)
+            else if (result.Failed)
+            {
+                // Quét không chạy được (thường do phần mềm diệt virus khác đã thay Defender) – không được báo "sạch".
+                LastScanSeverity = Severity.Warning;
+                LastScanResult = Loc.F("sec.scan.failed", $"0x{result.ExitCode:X8}");
+            }
+            else if (result.ThreatsReported)
             {
                 LastScanSeverity = Severity.Critical;
-                LastScanResult = Loc.F("sec.scan.threats", result.Threats.Count, string.Join(", ", result.Threats.Take(3)));
+                LastScanResult = result.Threats.Count > 0
+                    ? Loc.F("sec.scan.threats", result.Threats.Count, string.Join(", ", result.Threats.Take(3)))
+                    : Loc.T("sec.scan.threats_unnamed");
                 await RescanAsync();
             }
             else

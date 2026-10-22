@@ -21,6 +21,8 @@ public sealed class UninstallTests
     [InlineData("Zalo 24.10.1", "Zalo")]
     [InlineData("Notepad++ (64-bit x64)", "Notepad++")]
     [InlineData("Zoom Workplace", "Zoom Workplace")]
+    [InlineData("7-Zip 23.01 (x64)", "7-Zip")]
+    [InlineData("Microsoft SQL Server 2019 (64-bit)", "Microsoft SQL Server 2019")]
     public void CleanNameDropsVersionAndArchitecture(string name, string expected)
     {
         Assert.Equal(expected, LeftoverRules.CleanName(name));
@@ -38,6 +40,28 @@ public sealed class UninstallTests
         Assert.False(LeftoverRules.FolderMatches("Common Files", Program("Common Files")));
         Assert.False(LeftoverRules.FolderMatches("Zoom", Program("Zoom Workplace")));
         Assert.False(LeftoverRules.FolderMatches("VLC", Program("VLC")));
+
+        // Thư mục dùng chung của mọi phiên bản (chứa dữ liệu .mdf) không khớp với một phiên bản cụ thể.
+        Assert.False(LeftoverRules.FolderMatches("Microsoft SQL Server", Program("Microsoft SQL Server 2019 (64-bit)")));
+        Assert.False(LeftoverRules.FolderMatches("PostgreSQL", Program("PostgreSQL")));
+    }
+
+    [Theory]
+    [InlineData("MISA.mdf", true)]
+    [InlineData("db_log.LDF", true)]
+    [InlineData("backup.bak", true)]
+    [InlineData("data.sqlite", true)]
+    [InlineData("PG_VERSION", true)]
+    [InlineData("ibdata1", true)]
+    [InlineData("Báo cáo.xlsx", true)]
+    [InlineData("save01.sav", true)]
+    [InlineData("Thumbs.db", false)]
+    [InlineData("app.exe", false)]
+    [InlineData("settings.ini", false)]
+    [InlineData("readme.pdf", false)]
+    public void DataFilesAreRecognised(string fileName, bool isData)
+    {
+        Assert.Equal(isData, LeftoverRules.IsDataFile(fileName));
     }
 
     [Fact]
@@ -77,6 +101,32 @@ public sealed class UninstallTests
         Assert.True(Protected(@"C:\Program Files\Common Files"));  // tên dùng chung
         Assert.True(Protected(@"C:\Program Files\Foo"));            // chứa phần mềm khác đang cài
         Assert.True(Protected(@"C:\Program Files\Foo\Bar\Data"));   // nằm trong phần mềm khác
+        Assert.True(Protected(@"C:\Program Files\Microsoft SQL Server"));
+        Assert.True(Protected(@"C:\Program Files (x86)\Microsoft SQL Server"));
+        Assert.True(Protected(@"D:\PostgreSQL"));
+    }
+
+    [Fact]
+    public void LastSegmentWorksOnWindowsPaths()
+    {
+        Assert.Equal("16", LeftoverRules.LastSegment(@"C:\Program Files\PostgreSQL\16\"));
+        Assert.Equal("WinRAR", LeftoverRules.LastSegment(@"C:\Program Files\WinRAR"));
+    }
+
+    [Fact]
+    public void ServicesAndRegistryAreRemovedBeforeFiles()
+    {
+        var order = Enum.GetValues<LeftoverKind>().OrderBy(LeftoverRemover.Order).ToList();
+        Assert.Equal([LeftoverKind.Service, LeftoverKind.ScheduledTask, LeftoverKind.RegistryValue, LeftoverKind.RegistryKey,
+            LeftoverKind.Shortcut, LeftoverKind.File, LeftoverKind.Folder], order);
+    }
+
+    [Fact]
+    public void UnknownInstallStateCountsAsInstalled()
+    {
+        // Không đọc được mục gỡ cài đặt -> coi như còn cài, để không quét/xóa phần còn sót của phần mềm chưa gỡ xong.
+        Assert.True(Uninstaller.IsInstalled(new InstalledProgram { Id = "", Name = "X" }));
+        Assert.True(Uninstaller.IsInstalled(new InstalledProgram { Id = "garbage|id", Name = "X" }));
     }
 
     [Fact]
@@ -177,6 +227,7 @@ public sealed class UninstallTests
     [InlineData(2, "Access is denied.", DiskCheckStatus.Failed)]
     [InlineData(3, "Truy cập bị từ chối.", DiskCheckStatus.Failed)]
     [InlineData(-1, "", DiskCheckStatus.Failed)]
+    [InlineData(3, "Truy ca\u0323\u0302p bi\u0323 tu\u031B\u0300 cho\u0302\u0301i.", DiskCheckStatus.Failed)] // dấu tách rời (bảng mã OEM 1258)
     public void ChkdskOutputIsParsed(int exitCode, string output, DiskCheckStatus expected)
     {
         Assert.Equal(expected, DiskChecker.ParseChkdsk(exitCode, output));
@@ -193,11 +244,32 @@ public sealed class UninstallTests
     }
 
     [Fact]
+    public void DefenderExitCodesAreInterpreted()
+    {
+        var clean = DefenderScanner.Interpret(0, [], TimeSpan.FromMinutes(3));
+        Assert.True(clean.Completed);
+        Assert.False(clean.Failed);
+        Assert.False(clean.ThreatsReported);
+
+        var threats = DefenderScanner.Interpret(2, [], TimeSpan.FromMinutes(3));
+        Assert.True(threats.ThreatsReported);
+        Assert.False(threats.Failed);
+
+        // Defender bị phần mềm diệt virus khác thay thế: MpCmdRun lỗi -> không được báo "sạch".
+        var failed = DefenderScanner.Interpret(unchecked((int)0x800106BA), [], TimeSpan.FromSeconds(2));
+        Assert.True(failed.Failed);
+        Assert.False(failed.Completed);
+
+        var namedButError = DefenderScanner.Interpret(1, ["Trojan:Win32/Test"], TimeSpan.FromMinutes(1));
+        Assert.True(namedButError.ThreatsReported);
+    }
+
+    [Fact]
     public void UninstallTextsExist()
     {
         var vi = Loc.Load(Loc.Vietnamese);
         foreach (var kind in Enum.GetValues<LeftoverKind>()) Assert.True(vi.ContainsKey("leftover.kind." + kind.ToString().ToLowerInvariant()), kind.ToString());
-        foreach (var reason in new[] { "install_dir", "program_dir", "data_dir", "large_data" }) Assert.True(vi.ContainsKey("leftover.reason." + reason), reason);
+        foreach (var reason in new[] { "install_dir", "program_dir", "data_dir", "large_data", "contains_data" }) Assert.True(vi.ContainsKey("leftover.reason." + reason), reason);
         foreach (var status in new[] { "pending", "running", "waiting", "removed", "stillinstalled", "failed", "skipped" })
         {
             Assert.True(vi.ContainsKey("uninstall.status." + status), status);

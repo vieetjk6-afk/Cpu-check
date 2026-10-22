@@ -55,18 +55,38 @@ public static partial class LeftoverRules
         "CurrentVersion", "Uninstall", "Run", "Desktop", "Start Menu", "Startup", "Documents", "Downloads", "Public",
         "Users", "Default", "ProgramData", "Program Files", "Program Files (x86)", "AppData", "Local", "LocalLow", "Roaming",
         "Steam", "steamapps", "Tencent", "Riot Games", "Electron", "Squirrel", "nodejs", "Python", "dotnet",
+
+        // Thư mục dùng chung giữa nhiều phiên bản / thành phần, thường chứa dữ liệu (cơ sở dữ liệu, dự án).
+        "Microsoft SQL Server", "Microsoft SQL Server Compact Edition", "Microsoft Office", "Microsoft Visual Studio",
+        "Microsoft Analysis Services", "Microsoft.NET", "Reference Assemblies", "MSBuild", "IIS", "IIS Express", "Windows Kits",
+        "PostgreSQL", "MySQL", "MariaDB", "MongoDB",
     };
+
+    /// <summary>Tệp dữ liệu của người dùng (cơ sở dữ liệu, tài liệu, bản lưu game...): thư mục chứa chúng không bao giờ được chọn sẵn.</summary>
+    private static readonly HashSet<string> DataExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mdf", ".ldf", ".ndf", ".bak", ".trn", ".db", ".db3", ".sqlite", ".sqlite3", ".accdb", ".mdb", ".ibd", ".frm", ".myd", ".myi",
+        ".dbf", ".fdb", ".gdb", ".pst", ".ost", ".kdbx", ".doc", ".docx", ".xls", ".xlsx", ".xlsm", ".ppt", ".pptx", ".odt", ".ods", ".sav",
+    };
+
+    /// <summary>Tệp đánh dấu thư mục dữ liệu của máy chủ cơ sở dữ liệu (PostgreSQL, MySQL/MariaDB).</summary>
+    private static readonly HashSet<string> DataMarkers = new(StringComparer.OrdinalIgnoreCase) { "PG_VERSION", "ibdata1" };
+
+    public static bool IsDataFile(string fileName) =>
+        DataMarkers.Contains(fileName)
+        || (DataExtensions.Contains(System.IO.Path.GetExtension(fileName)) && !fileName.Equals("Thumbs.db", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Tên sản phẩm "sạch" để so khớp thư mục: bỏ số phiên bản, (x64)/(64-bit), hậu tố ngôn ngữ...
     /// "WinRAR 6.24 (64-bit)" → "WinRAR"; "Mozilla Firefox (x64 vi)" → "Mozilla Firefox"; "Zoom Workplace" → "Zoom Workplace".
+    /// Giữ năm/số hiệu sản phẩm ("SQL Server 2019") để không khớp thư mục dùng chung của mọi phiên bản.
     /// </summary>
     public static string CleanName(string name)
     {
         var text = ParenRegex().Replace(name, " ");
         text = VersionRegex().Replace(text, " ");
         text = ArchRegex().Replace(text, " ");
-        text = string.Join(' ', text.Split([' ', '-', '_'], StringSplitOptions.RemoveEmptyEntries));
+        text = string.Join(' ', text.Split([' ', '_'], StringSplitOptions.RemoveEmptyEntries).Where(t => t != "-"));
         return text.Trim(' ', '.', ',', '-');
     }
 
@@ -112,7 +132,7 @@ public static partial class LeftoverRules
     private static string Norm(string path) => path.Replace('/', '\\').TrimEnd('\\').ToUpperInvariant();
 
     /// <summary>Phần cuối của đường dẫn Windows (tự tách theo '\' để chạy giống nhau trên mọi hệ điều hành, kể cả khi test).</summary>
-    private static string LastSegment(string path)
+    public static string LastSegment(string path)
     {
         var trimmed = path.Replace('/', '\\').TrimEnd('\\');
         return trimmed[(trimmed.LastIndexOf('\\') + 1)..];
@@ -194,7 +214,7 @@ public static partial class LeftoverRules
     [GeneratedRegex(@"\([^)]*\)|\[[^\]]*\]")]
     private static partial Regex ParenRegex();
 
-    [GeneratedRegex(@"(?<![A-Za-z])v?\d+(\.\d+)+[a-z]?\b|(?<![A-Za-z])\d{4,}\b|\bversion\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"(?<![A-Za-z])v?\d+(\.\d+)+[a-z]?\b|\bversion\b", RegexOptions.IgnoreCase)]
     private static partial Regex VersionRegex();
 
     [GeneratedRegex(@"\b(x64|x86|64-bit|32-bit|64 bit|32 bit|amd64|arm64|win64|win32)\b", RegexOptions.IgnoreCase)]

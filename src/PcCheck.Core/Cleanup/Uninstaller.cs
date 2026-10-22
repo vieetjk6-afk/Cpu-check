@@ -27,6 +27,12 @@ public static partial class Uninstaller
 {
     private static readonly TimeSpan AfterExitWait = TimeSpan.FromMinutes(3);
 
+    /// <summary>Trình gỡ báo lỗi/bị hủy (mã thoát khác 0): chỉ chờ ngắn phòng khi gỡ vẫn đang hoàn tất.</summary>
+    private static readonly TimeSpan AfterErrorWait = TimeSpan.FromSeconds(15);
+
+    /// <summary>Mã thoát msiexec coi là thành công: 0, 1605 (sản phẩm không còn), 1641/3010 (xong, cần khởi động lại).</summary>
+    private static readonly HashSet<int> MsiSuccess = [0, 1605, 1641, 3010];
+
     /// <summary>Lệnh gỡ: im lặng khi có thể (QuietUninstallString / MSI /passive), nếu không thì trình gỡ bình thường.</summary>
     internal static (string File, string Args, bool Quiet) PlanCommand(InstalledProgram program, bool preferQuiet)
     {
@@ -68,18 +74,26 @@ public static partial class Uninstaller
             return UninstallResult.Failed;
         }
 
+        int? exitCode = null;
         if (process is not null)
         {
             using (process)
             {
                 await process.WaitForExitAsync(ct).ConfigureAwait(false);
-                Log.Info($"Trình gỡ {program.Name} thoát với mã {process.ExitCode}");
+                exitCode = process.ExitCode;
+                Log.Info($"Trình gỡ {program.Name} thoát với mã {exitCode}");
             }
+        }
+
+        // msiexec báo rõ kết quả (1602 hủy, 1603 lỗi, 1618 đang có cài đặt khác...) -> không cần chờ.
+        if (exitCode is { } code && Path.GetFileName(file).Equals("msiexec.exe", StringComparison.OrdinalIgnoreCase) && !MsiSuccess.Contains(code))
+        {
+            return IsInstalled(program) ? UninstallResult.StillInstalled : UninstallResult.Removed;
         }
 
         // Chờ mục gỡ cài đặt biến mất (trình gỡ có thể vẫn đang chạy ở tiến trình con).
         stage?.Report("waiting");
-        var deadline = DateTime.UtcNow + AfterExitWait;
+        var deadline = DateTime.UtcNow + (exitCode is null or 0 ? AfterExitWait : AfterErrorWait);
         while (IsInstalled(program))
         {
             if (DateTime.UtcNow > deadline) return UninstallResult.StillInstalled;
@@ -102,11 +116,14 @@ public static partial class Uninstaller
         }
     }
 
-    /// <summary>Mục gỡ cài đặt của phần mềm (Id dạng "LocalMachine|Registry64|tên khóa") còn tồn tại không.</summary>
+    /// <summary>
+    /// Mục gỡ cài đặt của phần mềm (Id dạng "LocalMachine|Registry64|tên khóa") còn tồn tại không.
+    /// Không đọc được -> coi như CÒN cài, để không bao giờ quét/xóa phần còn sót của phần mềm chưa gỡ xong.
+    /// </summary>
     public static bool IsInstalled(InstalledProgram program)
     {
         var parts = program.Id.Split('|');
-        if (parts.Length != 3 || !Enum.TryParse<RegistryHive>(parts[0], out var hive) || !Enum.TryParse<RegistryView>(parts[1], out var view)) return false;
+        if (parts.Length != 3 || !Enum.TryParse<RegistryHive>(parts[0], out var hive) || !Enum.TryParse<RegistryView>(parts[1], out var view)) return true;
         try
         {
             using var root = RegistryKey.OpenBaseKey(hive, view);
@@ -115,7 +132,8 @@ public static partial class Uninstaller
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
         {
-            return false;
+            Log.Warn($"Không đọc được mục gỡ cài đặt của {program.Name}", ex);
+            return true;
         }
     }
 

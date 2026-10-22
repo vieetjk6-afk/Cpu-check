@@ -13,7 +13,11 @@ namespace PcCheck.Core.Cleanup;
 /// </summary>
 public static class LeftoverScanner
 {
-    private const long LargeDataBytes = 500L * 1024 * 1024;
+    /// <summary>Thư mục chương trình còn sót lớn hơn mức này thì không chọn sẵn (sau khi gỡ thường chỉ còn vài tệp).</summary>
+    private const long LargeProgramBytes = 500L * 1024 * 1024;
+
+    /// <summary>Thư mục dữ liệu người dùng (AppData/ProgramData) lớn hơn mức này thì không chọn sẵn.</summary>
+    private const long LargeDataBytes = 50L * 1024 * 1024;
     private const string UninstallPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
 
     private sealed record Roots(string Windows, string[] Protected, (string Path, bool UserData)[] Search, string[] Shortcuts);
@@ -113,16 +117,19 @@ public static class LeftoverScanner
 
         foreach (var (path, userData, reason) in folders)
         {
-            var bytes = FolderSize(path);
-            var large = userData && bytes > LargeDataBytes;
+            // Chỉ chọn sẵn khi chắc chắn: tên thư mục trùng tên phần mềm, không chứa tệp dữ liệu, dung lượng nhỏ.
+            // Thư mục cài đặt ghi trong registry có thể là thư mục cha / thư mục dữ liệu (vd PostgreSQL\16 chứa data\) nên cũng phải qua kiểm tra này.
+            var (bytes, hasData) = Inspect(path);
+            var nameMatches = LeftoverRules.FolderMatches(LeftoverRules.LastSegment(path), program);
+            var large = bytes > (userData ? LargeDataBytes : LargeProgramBytes);
             list.Add(new Leftover
             {
                 Kind = LeftoverKind.Folder,
                 Path = path,
                 Program = program.Name,
                 Bytes = bytes,
-                HighConfidence = !large,
-                ReasonKey = large ? "leftover.reason.large_data" : "leftover.reason." + reason,
+                HighConfidence = nameMatches && !hasData && !large,
+                ReasonKey = hasData ? "leftover.reason.contains_data" : large ? "leftover.reason.large_data" : "leftover.reason." + reason,
             });
         }
 
@@ -151,23 +158,27 @@ public static class LeftoverScanner
         }
     }
 
-    private static long FolderSize(string path)
+    /// <summary>Dung lượng thư mục và có chứa tệp dữ liệu người dùng không. Không đọc hết được (quá nhiều tệp, lỗi) -> coi như có dữ liệu.</summary>
+    private static (long Bytes, bool HasData) Inspect(string path)
     {
         long total = 0;
         var count = 0;
+        var hasData = false;
         try
         {
             foreach (var file in new DirectoryInfo(path).EnumerateFiles("*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint }))
             {
                 total += file.Length;
-                if (++count > 200_000) break;
+                hasData |= LeftoverRules.IsDataFile(file.Name);
+                if (++count > 200_000) return (total, true);
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            return (total, true);
         }
 
-        return total;
+        return (total, hasData);
     }
 
     // ===== Lối tắt =====

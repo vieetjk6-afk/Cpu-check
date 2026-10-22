@@ -25,7 +25,7 @@ public static class LeftoverRemover
         long freed = 0;
 
         // Xóa dịch vụ/tác vụ/registry trước, tệp sau (tệp có thể đang bị dịch vụ giữ).
-        foreach (var item in items.OrderByDescending(i => i.Kind is LeftoverKind.Service or LeftoverKind.ScheduledTask).ThenBy(i => i.Kind))
+        foreach (var item in items.OrderBy(i => Order(i.Kind)))
         {
             ct.ThrowIfCancellationRequested();
             progress?.Report(item.Path);
@@ -35,7 +35,7 @@ public static class LeftoverRemover
             {
                 ok = item.Kind switch
                 {
-                    LeftoverKind.Folder or LeftoverKind.File or LeftoverKind.Shortcut => Recycle(item.Path),
+                    LeftoverKind.Folder or LeftoverKind.File or LeftoverKind.Shortcut => await RecycleAsync(item).ConfigureAwait(false),
                     LeftoverKind.RegistryKey => await DeleteKeyAsync(item.Path, Path.Combine(backup, $"{index:D3}-key.reg"), ct).ConfigureAwait(false),
                     LeftoverKind.RegistryValue => await DeleteValueAsync(item.Path, item.ValueName, Path.Combine(backup, $"{index:D3}-run.reg"), ct).ConfigureAwait(false),
                     LeftoverKind.ScheduledTask => await DeleteTaskAsync(item.Path, Path.Combine(backup, $"{index:D3}-task.xml"), ct).ConfigureAwait(false),
@@ -73,7 +73,53 @@ public static class LeftoverRemover
         return new LeftoverRemoval(removed, failed, freed, Directory.Exists(backup) ? backup : "");
     }
 
+    internal static int Order(LeftoverKind kind) => kind switch
+    {
+        LeftoverKind.Service => 0,
+        LeftoverKind.ScheduledTask => 1,
+        LeftoverKind.RegistryValue => 2,
+        LeftoverKind.RegistryKey => 3,
+        LeftoverKind.Shortcut => 4,
+        LeftoverKind.File => 5,
+        _ => 6,
+    };
+
     // ===== Thùng rác (SHFileOperation, FOF_ALLOWUNDO) =====
+
+    /// <summary>
+    /// Chuyển vào Thùng rác trên một luồng STA riêng (không làm đơ cửa sổ). Chỉ khi chắc chắn Thùng rác giữ được tệp:
+    /// nếu không, SHFileOperation sẽ âm thầm xóa vĩnh viễn – khi đó từ chối và báo "không xóa được".
+    /// </summary>
+    private static Task<bool> RecycleAsync(Leftover item)
+    {
+        if (!File.Exists(item.Path) && !Directory.Exists(item.Path)) return Task.FromResult(true);
+        var bytes = item.Bytes > 0 ? item.Bytes : File.Exists(item.Path) ? new FileInfo(item.Path).Length : 0;
+        if (!RecycleBin.CanHold(item.Path, bytes, out var why))
+        {
+            Log.Warn($"Không chuyển vào Thùng rác được ({why}), giữ nguyên: {item.Path}");
+            return Task.FromResult(false);
+        }
+
+        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                tcs.SetResult(Recycle(item.Path));
+            }
+            catch (Exception ex)
+            {
+                tcs.SetException(ex);
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "PcCheck recycle",
+        };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        return tcs.Task;
+    }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct ShFileOpStruct
