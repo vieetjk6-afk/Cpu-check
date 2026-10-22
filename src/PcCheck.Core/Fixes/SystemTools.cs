@@ -29,6 +29,11 @@ public static class SystemTools
     /// <summary>Cài driver PawnIO để đọc nhiệt độ CPU chính xác (tải bản chính thức, kiểm tra chữ ký, cài im lặng).</summary>
     public const string CpuSensor = "cpu-sensor";
 
+    /// <summary>Quét virus bằng Microsoft Defender: nhanh / toàn bộ / ngoại tuyến (khởi động lại để quét trước khi Windows chạy).</summary>
+    public const string DefenderQuick = "defender-quick";
+    public const string DefenderFull = "defender-full";
+    public const string DefenderOffline = "defender-offline";
+
     /// <summary>Danh sách hiển thị ở mục "Công cụ sửa lỗi nhanh". Glyph là mã Segoe MDL2 Assets.</summary>
     public static IReadOnlyList<SystemTool> QuickTools { get; } =
     [

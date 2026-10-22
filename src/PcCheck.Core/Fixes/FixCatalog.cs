@@ -15,6 +15,7 @@ public static class Pages
     public const string Software = "software";
     public const string Startup = "startup";
     public const string Issues = "issues";
+    public const string Security = "security";
     public const string Widget = "widget";
     public const string Settings = "settings";
 }

@@ -66,6 +66,7 @@ public sealed class MainViewModel : ObservableObject
         Drivers = new DriversViewModel(this);
         Cleanup = new CleanupViewModel(this);
         Issues = new IssuesViewModel(this);
+        Security = new SecurityViewModel(this);
         Settings = new SettingsViewModel(this);
         Widget = new WidgetViewModel(this);
         Updates = new UpdateViewModel(this);
@@ -79,6 +80,7 @@ public sealed class MainViewModel : ObservableObject
             new(Pages.Drivers, "nav.drivers", "", Drivers),
             new(Pages.Cleanup, "nav.cleanup", "", Cleanup),
             new(Pages.Issues, "nav.issues", "", Issues),
+            new(Pages.Security, "nav.security", "\uEA18", Security),
             new(Pages.Widget, "nav.widget", "\uE718", Widget),
         ];
         SettingsNav = new NavItem(Pages.Settings, "nav.settings", "", Settings);
@@ -122,6 +124,7 @@ public sealed class MainViewModel : ObservableObject
     public DriversViewModel Drivers { get; }
     public CleanupViewModel Cleanup { get; }
     public IssuesViewModel Issues { get; }
+    public SecurityViewModel Security { get; }
     public SettingsViewModel Settings { get; }
     public WidgetViewModel Widget { get; }
     public UpdateViewModel Updates { get; }
@@ -464,6 +467,7 @@ public sealed class MainViewModel : ObservableObject
         SetBadge(Pages.Compatibility, IssueCategory.Compatibility);
         SetBadge(Pages.Drivers, IssueCategory.Driver);
         SetBadge(Pages.Cleanup, IssueCategory.Junk, IssueCategory.Software);
+        SetBadge(Pages.Security, IssueCategory.Security);
         var issuesNav = NavItems.First(n => n.Key == Pages.Issues);
         issuesNav.Badge = result.Issues.Count(i => i.Severity >= Severity.Warning);
         issuesNav.BadgeSeverity = result.Issues.Count == 0 ? Severity.Ok : result.Issues.Max(i => i.Severity);

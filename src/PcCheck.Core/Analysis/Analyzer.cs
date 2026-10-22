@@ -10,6 +10,7 @@ public static class Analyzer
     {
         var driverProblems = DriverAnalyzer.FindProblems(data.Devices, now);
         var checks = CompatibilityAnalyzer.Analyze(data, now);
+        var security = SafeSecurity(data, now);
 
         var issues = new List<Issue>();
         Collect(issues, () => HardwareAnalyzer.Analyze(data));
@@ -17,6 +18,7 @@ public static class Analyzer
         Collect(issues, () => SystemAnalyzer.Analyze(data, now));
         Collect(issues, () => CleanupAnalyzer.Analyze(data, now));
         Collect(issues, () => CompatibilityAnalyzer.ToIssues(checks, data.Hardware.Os.IsWindows11));
+        Collect(issues, () => SecurityAnalyzer.ToIssues(security));
 
         var unique = issues
             .GroupBy(i => i.Id)
@@ -33,9 +35,23 @@ public static class Analyzer
             Checks = checks,
             DriverProblems = driverProblems,
             Score = HealthScore.Compute(unique),
+            Security = security,
             Time = now,
             Duration = duration,
         };
+    }
+
+    private static SecurityReport SafeSecurity(ScanData data, DateTime now)
+    {
+        try
+        {
+            return SecurityAnalyzer.Analyze(data, now);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Phân tích bảo mật lỗi", ex);
+            return SecurityReport.Empty;
+        }
     }
 
     private static void Collect(List<Issue> output, Func<IEnumerable<Issue>> producer)

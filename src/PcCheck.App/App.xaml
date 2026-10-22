@@ -235,6 +235,7 @@
             <DataTemplate DataType="{x:Type vm:DriversViewModel}"><views:DriversView /></DataTemplate>
             <DataTemplate DataType="{x:Type vm:CleanupViewModel}"><views:CleanupView /></DataTemplate>
             <DataTemplate DataType="{x:Type vm:IssuesViewModel}"><views:IssuesView /></DataTemplate>
+            <DataTemplate DataType="{x:Type vm:SecurityViewModel}"><views:SecurityView /></DataTemplate>
             <DataTemplate DataType="{x:Type vm:SettingsViewModel}"><views:SettingsView /></DataTemplate>
             <DataTemplate DataType="{x:Type vm:WidgetViewModel}"><views:WidgetView /></DataTemplate>
         </ResourceDictionary>

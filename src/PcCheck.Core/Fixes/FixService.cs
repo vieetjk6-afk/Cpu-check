@@ -133,6 +133,20 @@ public static class FixService
             case SystemTools.CpuSensor:
                 return await Sensors.PawnIoInstaller.InstallAsync(null, ct).ConfigureAwait(false);
 
+            case SystemTools.DefenderQuick:
+            case SystemTools.DefenderFull:
+            {
+                var mp = MpCmdRun();
+                if (mp is null) return new FixOutcome(false, L("fix.result.no_defender"));
+                OpenConsole($"\"{mp}\" -Scan -ScanType {(parts[0] == SystemTools.DefenderQuick ? 1 : 2)}");
+                return new FixOutcome(true, L("fix.result.console"));
+            }
+
+            case SystemTools.DefenderOffline:
+                return await RunHiddenAsync("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -Command \"Start-MpWDOScan\"", ct).ConfigureAwait(false) == 0
+                    ? new FixOutcome(true, L("fix.result.offline_scan"))
+                    : new FixOutcome(false, L("fix.result.failed", "Start-MpWDOScan"));
+
             case SystemTools.StoreReset:
                 Start("wsreset.exe");
                 return new FixOutcome(true, L("fix.result.opened"));
@@ -146,6 +160,33 @@ public static class FixService
             default:
                 return new FixOutcome(false, L("fix.result.unsupported"));
         }
+    }
+
+    /// <summary>MpCmdRun.exe của Defender: bản mới nhất trong ProgramData\...\Platform, nếu không có thì trong Program Files.</summary>
+    private static string? MpCmdRun()
+    {
+        var platform = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Microsoft", "Windows Defender", "Platform");
+        if (Directory.Exists(platform))
+        {
+            var latest = Directory.EnumerateDirectories(platform)
+                .Select(d => (Dir: d, Version: Version.TryParse(Path.GetFileName(d).Split('-')[0], out var v) ? v : null))
+                .Where(x => x.Version is not null && File.Exists(Path.Combine(x.Dir, "MpCmdRun.exe")))
+                .OrderByDescending(x => x.Version)
+                .FirstOrDefault();
+            if (latest.Dir is not null) return Path.Combine(latest.Dir, "MpCmdRun.exe");
+        }
+
+        var programFiles = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Windows Defender", "MpCmdRun.exe");
+        return File.Exists(programFiles) ? programFiles : null;
+    }
+
+    /// <summary>Tắt một tác vụ hẹn giờ (đường dẫn dạng \Thư mục\Tên).</summary>
+    public static async Task<FixOutcome> DisableTaskAsync(string taskPath, CancellationToken ct = default)
+    {
+        var name = taskPath.Replace("\"", "", StringComparison.Ordinal);
+        return await RunHiddenAsync("schtasks.exe", $"/Change /TN \"{name}\" /Disable", ct).ConfigureAwait(false) == 0
+            ? new FixOutcome(true, L("fix.result.task_disabled", Path.GetFileName(name)))
+            : new FixOutcome(false, L("fix.result.failed", "schtasks"));
     }
 
     /// <summary>Gỡ cài đặt phần mềm (mở trình gỡ của chính phần mềm đó, hoặc Remove-AppxPackage cho app Store).</summary>

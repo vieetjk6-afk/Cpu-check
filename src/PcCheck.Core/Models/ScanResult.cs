@@ -11,6 +11,7 @@ public sealed class ScanData
     public List<JunkCategory> Junk { get; set; } = [];
     public List<InstalledProgram> Programs { get; set; } = [];
     public List<StartupItem> Startup { get; set; } = [];
+    public SecurityData Security { get; set; } = new();
 }
 
 public sealed class ScanResult
@@ -20,6 +21,7 @@ public sealed class ScanResult
     public required IReadOnlyList<CompatibilityCheck> Checks { get; init; }
     public required IReadOnlyList<DriverProblem> DriverProblems { get; init; }
     public required int Score { get; init; }
+    public SecurityReport Security { get; init; } = SecurityReport.Empty;
     public DateTime Time { get; init; } = DateTime.Now;
     public TimeSpan Duration { get; init; }
 

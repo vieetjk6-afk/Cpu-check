@@ -72,16 +72,36 @@ public static class IssueGuides
         ("compat/win11/summary", "win11"),
     ];
 
-    public static IEnumerable<string> AllKeys => Map.Select(m => m.Key).Distinct();
+    /// <summary>Hướng dẫn của trang Bảo mật: Id dạng "secure/&lt;khóa&gt;/..." (khóa bắt đầu bằng "sec_").</summary>
+    public static readonly IReadOnlyList<string> SecurityKeys =
+    [
+        "sec_spyware", "sec_monitoring", "sec_remote", "sec_device_access", "sec_autostart", "sec_process", "sec_masquerade",
+        "sec_network", "sec_listen", "sec_proxy", "sec_browser_policy", "sec_browser_forced", "sec_extension", "sec_root_cert",
+        "sec_hosts", "sec_threat", "sec_exclusion", "sec_tamper", "sec_rdp", "sec_remote_service", "sec_smb1", "sec_autologon",
+        "sec_hidden_account", "sec_builtin_admin", "sec_guest", "sec_admins", "sec_managed", "sec_ifeo", "sec_appinit",
+        "sec_winlogon", "sec_smartscreen", "sec_secureboot", "sec_bitlocker",
+    ];
+
+    public static IEnumerable<string> AllKeys => Map.Select(m => m.Key).Concat(SecurityKeys).Distinct();
 
     public static IssueGuide? Find(string issueId)
     {
+        if (issueId.StartsWith("secure/", StringComparison.Ordinal))
+        {
+            var rest = issueId[7..];
+            var slash = rest.IndexOf('/');
+            var key = slash > 0 ? rest[..slash] : rest;
+            return SecurityKeys.Contains(key) ? ForKey(key) : null;
+        }
+
         var hit = Map.Where(m => issueId.StartsWith(m.Prefix, StringComparison.Ordinal))
             .OrderByDescending(m => m.Prefix.Length)
             .Select(m => m.Key)
             .FirstOrDefault();
-        return hit is null ? null : new IssueGuide(hit, L($"guide.{hit}.cause"), L($"guide.{hit}.steps"));
+        return hit is null ? null : ForKey(hit);
     }
+
+    public static IssueGuide ForKey(string key) => new(key, L($"guide.{key}.cause"), L($"guide.{key}.steps"));
 
     public static void Attach(IEnumerable<Issue> issues)
     {

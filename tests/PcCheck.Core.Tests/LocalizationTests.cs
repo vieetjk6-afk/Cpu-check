@@ -119,6 +119,7 @@ public sealed partial class LocalizationTests
     [GeneratedRegex("\"([a-z][a-z0-9_-]*(?:\\.[a-z0-9_-]+)+)\"")]
     private static partial Regex CsKey();
 
-    [GeneratedRegex(@"\.(exe|msc|cpl|dll|json|log|ini|xaml|html)$")]
+    // Tên tệp và tên miền (vd google.com, vietcombank.com.vn) không phải khóa dịch.
+    [GeneratedRegex(@"\.(exe|msc|cpl|dll|json|log|ini|xaml|html|com|net|org|vn|me|io)$")]
     private static partial Regex FileLike();
 }

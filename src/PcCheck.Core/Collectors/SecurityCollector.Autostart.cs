@@ -1,0 +1,198 @@
+using System.Xml.Linq;
+using Microsoft.Win32;
+using PcCheck.Core.Analysis;
+using PcCheck.Core.Models;
+using PcCheck.Core.Util;
+
+namespace PcCheck.Core.Collectors;
+
+public static partial class SecurityCollector
+{
+    private const string RunOncePath = @"Software\Microsoft\Windows\CurrentVersion\RunOnce";
+
+    private static List<AutostartEntry> ReadAutostart()
+    {
+        var list = new List<AutostartEntry>();
+
+        // Khóa Run + thư mục Startup: dùng lại StartupCollector (có cả trạng thái bật/tắt kiểu Task Manager).
+        foreach (var item in StartupCollector.Collect())
+        {
+            list.Add(new AutostartEntry
+            {
+                Source = item.Location is StartupLocation.UserStartupFolder or StartupLocation.CommonStartupFolder ? AutostartSource.StartupFolder : AutostartSource.RunKey,
+                Name = item.Name,
+                Command = item.Command,
+                Location = item.Location.ToString(),
+                Enabled = item.Enabled,
+                ActionId = item.Id,
+            });
+        }
+
+        foreach (var (hive, view, label) in new[]
+                 {
+                     (RegistryHive.CurrentUser, RegistryView.Default, @"HKCU\" + RunOncePath),
+                     (RegistryHive.LocalMachine, RegistryView.Registry64, @"HKLM\" + RunOncePath),
+                     (RegistryHive.LocalMachine, RegistryView.Registry32, @"HKLM\WOW6432Node\" + RunOncePath),
+                 })
+        {
+            try
+            {
+                using var root = RegistryKey.OpenBaseKey(hive, view);
+                using var key = root.OpenSubKey(RunOncePath);
+                if (key is null) continue;
+                foreach (var name in key.GetValueNames().Where(n => n.Length > 0))
+                {
+                    list.Add(new AutostartEntry { Source = AutostartSource.RunOnce, Name = name, Command = key.GetValue(name)?.ToString() ?? "", Location = label });
+                }
+            }
+            catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+            {
+            }
+        }
+
+        list.AddRange(ReadScheduledTasks());
+
+        foreach (var entry in list.Where(e => e.Target is null))
+        {
+            entry.Flags = SecurityCatalog.AnalyzeCommand(entry.Command);
+            var exe = ResolveExecutable(entry.Command);
+
+            // Chạy qua trình thông dịch: tệp đáng xét là script trong tham số (vd wscript.exe C:\Users\...\a.vbs).
+            if (entry.Flags.HasFlag(CommandFlags.ScriptHost) && SecurityCatalog.ScriptPathOf(entry.Command) is { } script) exe = script;
+            entry.Target = exe.Length > 0 ? new FileTrust(exe, true, null, "", "", SecurityCatalog.Classify(exe)) : null;
+        }
+
+        Parallel.ForEach(list.Where(e => e.Target is not null), new ParallelOptions { MaxDegreeOfParallelism = 4 },
+            e => e.Target = TrustChecker.Check(e.Target!.Path));
+        return list;
+    }
+
+    /// <summary>Tệp thực thi của lệnh; tên trần (vd "rundll32.exe") được tìm trong System32.</summary>
+    private static string ResolveExecutable(string command)
+    {
+        var exe = SecurityCatalog.ExecutableOf(command);
+        if (exe.Length == 0 || Path.IsPathRooted(exe)) return exe;
+        var system = Path.Combine(Environment.SystemDirectory, exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? exe : exe + ".exe");
+        return File.Exists(system) ? system : exe;
+    }
+
+    /// <summary>
+    /// Tác vụ hẹn giờ: đọc tệp XML trong %SystemRoot%\System32\Tasks. Bỏ qua tác vụ của Windows (thư mục \Microsoft\
+    /// chạy tệp trong thư mục Windows) – trừ khi lệnh có dấu hiệu bất thường.
+    /// </summary>
+    private static List<AutostartEntry> ReadScheduledTasks()
+    {
+        var list = new List<AutostartEntry>();
+        var root = Path.Combine(Environment.SystemDirectory, "Tasks");
+        if (!Directory.Exists(root)) return list;
+
+        List<string> files;
+        try
+        {
+            files = Directory.EnumerateFiles(root, "*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true }).ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return list;
+        }
+
+        foreach (var file in files)
+        {
+            var taskPath = file[root.Length..].Replace('/', '\\');
+            XDocument doc;
+            try
+            {
+                doc = XDocument.Load(file);
+            }
+            catch (Exception)
+            {
+                continue;
+            }
+
+            var elements = doc.Descendants().ToList();
+            var settings = elements.FirstOrDefault(e => e.Name.LocalName == "Settings");
+            var enabled = !string.Equals(settings?.Elements().FirstOrDefault(e => e.Name.LocalName == "Enabled")?.Value, "false", StringComparison.OrdinalIgnoreCase);
+            var hidden = string.Equals(settings?.Elements().FirstOrDefault(e => e.Name.LocalName == "Hidden")?.Value, "true", StringComparison.OrdinalIgnoreCase);
+
+            foreach (var exec in elements.Where(e => e.Name.LocalName == "Exec"))
+            {
+                var command = exec.Elements().FirstOrDefault(e => e.Name.LocalName == "Command")?.Value.Trim() ?? "";
+                if (command.Length == 0) continue;
+                var arguments = exec.Elements().FirstOrDefault(e => e.Name.LocalName == "Arguments")?.Value.Trim() ?? "";
+                var full = (command.Contains(' ') && !command.StartsWith('"') ? $"\"{command}\"" : command) + (arguments.Length > 0 ? " " + arguments : "");
+
+                var flags = SecurityCatalog.AnalyzeCommand(full);
+                var exe = ResolveExecutable(full);
+                var inWindows = SecurityCatalog.Classify(exe) == PathKind.Windows;
+                var microsoftTask = taskPath.StartsWith(@"\Microsoft\", StringComparison.OrdinalIgnoreCase);
+                var unusual = flags.HasFlag(CommandFlags.EncodedCommand) || flags.HasFlag(CommandFlags.Downloads) || flags.HasFlag(CommandFlags.HiddenWindow);
+                if (microsoftTask && inWindows && !unusual) continue;
+
+                // Tác vụ chạy công cụ Windows (vd rundll32) với tham số bình thường của phần mềm khác: vẫn liệt kê, phân tích bên dưới.
+                list.Add(new AutostartEntry
+                {
+                    Source = AutostartSource.ScheduledTask,
+                    Name = Path.GetFileName(taskPath),
+                    Command = full,
+                    Location = taskPath,
+                    Enabled = enabled,
+                    Hidden = hidden,
+                    ActionId = taskPath,
+                });
+            }
+        }
+
+        return list;
+    }
+
+    // ===== Chiếm quyền khởi chạy (IFEO, Winlogon, AppInit) =====
+
+    private static List<HijackEntry> ReadHijacks()
+    {
+        var list = new List<HijackEntry>();
+        const string ifeo = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options";
+        foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+        {
+            using var root = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
+            using (var key = root.OpenSubKey(ifeo))
+            {
+                foreach (var name in key?.GetSubKeyNames() ?? [])
+                {
+                    try
+                    {
+                        using var sub = key!.OpenSubKey(name);
+                        if (sub?.GetValue("Debugger") is string debugger && debugger.Trim().Length > 0)
+                            list.Add(new HijackEntry(HijackKind.IfeoDebugger, name, debugger.Trim(), $@"HKLM\{ifeo}\{name}"));
+                    }
+                    catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException)
+                    {
+                    }
+                }
+            }
+
+            const string windows = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows";
+            using (var key = root.OpenSubKey(windows))
+            {
+                var dlls = key?.GetValue("AppInit_DLLs") as string ?? "";
+                var load = key?.GetValue("LoadAppInit_DLLs") is int l && l != 0;
+                if (load && dlls.Trim().Length > 0) list.Add(new HijackEntry(HijackKind.AppInitDlls, "AppInit_DLLs", dlls.Trim(), $@"HKLM\{windows}"));
+            }
+        }
+
+        const string winlogon = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon";
+        using (var key = Registry.LocalMachine.OpenSubKey(winlogon))
+        {
+            if (key?.GetValue("Shell") is string shell) list.Add(new HijackEntry(HijackKind.WinlogonShell, "Shell", shell, $@"HKLM\{winlogon}"));
+            if (key?.GetValue("Userinit") is string userinit) list.Add(new HijackEntry(HijackKind.WinlogonUserinit, "Userinit", userinit, $@"HKLM\{winlogon}"));
+        }
+
+        // Shell riêng cho người dùng hiện tại (thủ thuật thay explorer.exe chỉ với một tài khoản).
+        using (var key = Registry.CurrentUser.OpenSubKey(winlogon))
+        {
+            if (key?.GetValue("Shell") is string shell && shell.Trim().Length > 0)
+                list.Add(new HijackEntry(HijackKind.WinlogonShell, "Shell", shell, $@"HKCU\{winlogon}"));
+        }
+
+        return list;
+    }
+}

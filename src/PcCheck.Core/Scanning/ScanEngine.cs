@@ -24,6 +24,7 @@ public sealed class ScanEngine(SensorService sensors)
             ("scan.step.events", () => Task.Run(() => data.Events = EventLogCollector.Collect(), ct)),
             ("scan.step.system", () => Task.Run(() => data.System = SystemStatusCollector.Collect(), ct)),
             ("scan.step.junk", async () => data.Junk = await JunkScanner.ScanAsync(ct).ConfigureAwait(false)),
+            ("scan.step.security", () => Task.Run(() => data.Security = SecurityCollector.Collect(), ct)),
             ("scan.step.software", () => Task.Run(() =>
             {
                 data.Programs = SoftwareCollector.Collect();
