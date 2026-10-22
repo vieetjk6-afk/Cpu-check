@@ -402,6 +402,12 @@ public sealed class HealthViewModel : PageViewModel
         float? MaxTemp() => readings.Where(r => r.IsMeasuredTemperature).Select(r => r.Value).DefaultIfEmpty(null).Max();
         float? Find(SensorKind kind, params string[] names) => SensorSnapshot.Pick(readings, card.Kind, kind, names);
 
+        // Chỉ lấy cảm biến đúng tên (Find sẽ lấy cảm biến đầu tiên cùng loại nếu không khớp tên).
+        float? Exact(SensorKind kind, params string[] names) => readings
+            .Where(r => r.Kind == kind && r.Value is not null && names.Any(n => r.Name.Equals(n, StringComparison.OrdinalIgnoreCase)))
+            .Select(r => r.Value)
+            .FirstOrDefault();
+
         switch (card.Key == "acpi" ? (SensorHardwareKind?)null : card.Kind)
         {
             case SensorHardwareKind.Cpu:
@@ -503,7 +509,11 @@ public sealed class HealthViewModel : PageViewModel
                 var (warn, critical) = DeviceLimits(readings,
                     solid ? Thresholds.SsdTempWarn : Thresholds.HddTempWarn, solid ? Thresholds.SsdTempCritical : Thresholds.HddTempCritical);
                 SetPrimaryTemp(card, temp, warn, critical, c);
-                var life = Find(SensorKind.Level, "Remaining Life", "Available Spare") ?? (disk?.WearPercent is { } w ? 100 - w : null);
+                // Tuổi thọ còn lại: cảm biến "Life" của ổ (100 - Percentage Used), không nhầm với "Available Spare" (vùng dự phòng).
+                var life = Exact(SensorKind.Level, "Life", "Remaining Life")
+                           ?? (Exact(SensorKind.Level, "Percentage Used") is { } used ? Math.Max(0f, 100 - used) : (float?)null)
+                           ?? (disk?.WearPercent is { } w ? 100 - w : (float?)null);
+                var powerOnHours = disk?.PowerOnHours ?? (Exact(SensorKind.Counter, "Power On Hours") is { } poh and > 0 ? (long)poh : null);
                 var activity = Find(SensorKind.Load, "Total Activity");
                 card.Secondary = Join(life is null ? null : Loc.F("device.life", Format.Percent(life, c)), activity is null ? null : Loc.F("device.busy", Format.Percent(activity, c)));
                 if (disk is not null)
@@ -514,6 +524,7 @@ public sealed class HealthViewModel : PageViewModel
                         DiskHealth.Unhealthy => Severity.Critical,
                         DiskHealth.Warning => Severity.Warning,
                         _ when disk.PredictFailure == true => Severity.Critical,
+                        _ when life is <= 10 => Severity.Warning,
                         DiskHealth.Healthy => Severity.Ok,
                         _ => Severity.Info,
                     };
@@ -522,8 +533,8 @@ public sealed class HealthViewModel : PageViewModel
                     [
                         new(Loc.T("disk.type"), $"{Labels.MediaType(disk)} · {Format.OrDash(disk.BusType)} · {Format.MarketingSize(disk.SizeBytes, c)}"),
                         new(Loc.T("disk.letters"), disk.DriveLetters.Count > 0 ? string.Join(", ", disk.DriveLetters) : "—"),
-                        new(Loc.T("disk.life"), disk.WearPercent is { } wear ? Format.Percent(100 - wear, c) : "—"),
-                        new(Loc.T("disk.power_on"), disk.PowerOnHours is { } h ? Loc.F("disk.power_on_value", h, Math.Round(h / 24.0)) : "—"),
+                        new(Loc.T("disk.life"), life is null ? "—" : Format.Percent(life, c)),
+                        new(Loc.T("disk.power_on"), powerOnHours is { } h ? Loc.F("disk.power_on_value", h, Math.Round(h / 24.0)) : "—"),
                         new(Loc.T("disk.smart"), disk.PredictFailure switch { true => Loc.T("disk.smart.fail"), false => Loc.T("disk.smart.ok"), null => "—" }),
                         new(Loc.T("disk.errors"), errors > 0 ? errors.ToString("N0", c) : Loc.T("disk.no_errors")),
                         new(Loc.T("disk.firmware"), Format.OrDash(disk.Firmware)),
@@ -673,6 +684,7 @@ public sealed class HealthViewModel : PageViewModel
         SensorKind.Level => "sensor.section.level",
         SensorKind.Data or SensorKind.SmallData => "sensor.section.data",
         SensorKind.Throughput => "sensor.section.throughput",
+        SensorKind.Counter => "sensor.section.counter",
         _ => "sensor.section.other",
     });
 
@@ -691,6 +703,7 @@ public sealed class HealthViewModel : PageViewModel
             SensorKind.Data => v.ToString("0.0", c) + " GB",
             SensorKind.SmallData => v.ToString("0", c) + " MB",
             SensorKind.Throughput => Format.Speed(v, c),
+            SensorKind.Counter => v.ToString("N0", c),
             _ => v.ToString("0.##", c),
         };
     }

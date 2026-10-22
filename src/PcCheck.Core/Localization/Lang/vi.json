@@ -263,6 +263,7 @@
   "sensor.section.level": "Mức / tuổi thọ",
   "sensor.section.data": "Dung lượng",
   "sensor.section.throughput": "Tốc độ đọc / ghi",
+  "sensor.section.counter": "Bộ đếm",
   "sensor.section.other": "Khác",
   "common.expand_all": "Mở rộng tất cả",
   "common.collapse_all": "Thu gọn tất cả",

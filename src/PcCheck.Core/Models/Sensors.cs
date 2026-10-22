@@ -30,6 +30,9 @@ public enum SensorKind
 
     /// <summary>Tốc độ truyền (byte/giây), vd tốc độ đọc/ghi ổ đĩa.</summary>
     Throughput,
+
+    /// <summary>Bộ đếm (vd số giờ đã chạy, số lần bật của ổ cứng).</summary>
+    Counter,
     Other,
 }
 

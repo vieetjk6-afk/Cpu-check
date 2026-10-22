@@ -280,6 +280,7 @@ public sealed class SensorService : IDisposable
         SensorType.Data => SensorKind.Data,
         SensorType.SmallData => SensorKind.SmallData,
         SensorType.Throughput => SensorKind.Throughput,
+        SensorType.Factor => SensorKind.Counter,
         _ => SensorKind.Other,
     };
 

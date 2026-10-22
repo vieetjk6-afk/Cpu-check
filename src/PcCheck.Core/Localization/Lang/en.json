@@ -263,6 +263,7 @@
   "sensor.section.level": "Level / life",
   "sensor.section.data": "Data",
   "sensor.section.throughput": "Throughput",
+  "sensor.section.counter": "Counters",
   "sensor.section.other": "Other",
   "common.expand_all": "Expand all",
   "common.collapse_all": "Collapse all",
