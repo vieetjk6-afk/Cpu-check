@@ -96,15 +96,18 @@ public static partial class SecurityCollector
             if (time < cutoff) continue;
             names.TryGetValue(d.Str("ThreatID"), out var threat);
 
-            // ThreatStatusID: 1 đã phát hiện, 2 cách ly, 3 đã xóa, 4 cho phép, 5 làm sạch... 102/103/104/105/106/107 thất bại.
+            // ThreatStatusID: 0 không rõ, 1 phát hiện, 2 đã làm sạch, 3 cách ly, 4 đã xóa, 5 được cho phép, 6 đã chặn,
+            // 102 cách ly lỗi, 103 xóa lỗi, 104 cho phép lỗi, 105 bỏ dở, 107 chặn lỗi.
             var statusId = d.Int("ThreatStatusID") ?? 0;
-            var active = threat?.Bool("IsActive") == true || statusId is 1 or 4 or >= 100;
+            var active = threat?.Bool("IsActive") == true || statusId is 1 or 102 or 103 or 104 or 105 or 107;
+            var allowed = statusId == 5;
             info.Threats.Add(new ThreatEntry(
                 threat?.Str("ThreatName") is { Length: > 0 } n ? n : "Threat " + d.Str("ThreatID"),
                 threat?.Int("SeverityID") ?? 0,
                 time,
                 d.StrArray("Resources").Select(r => r.Contains('_') ? r[(r.IndexOf('_') + 1)..] : r).Take(5).ToList(),
-                active));
+                active,
+                allowed));
         }
 
         info.Threats = info.Threats.OrderByDescending(t => t.Time).Take(30).ToList();
@@ -201,8 +204,17 @@ public static partial class SecurityCollector
     /// <summary>Dịch vụ tự khởi động không thuộc Windows cũng là một dạng tự chạy.</summary>
     private static void AddServiceAutostart(SecurityData data)
     {
-        foreach (var service in data.Services.Where(s => s.AutoStart && s.File is { Kind: not PathKind.Windows }))
+        const CommandFlags suspicious = CommandFlags.ScriptHost | CommandFlags.EncodedCommand | CommandFlags.Downloads | CommandFlags.HiddenWindow;
+        foreach (var service in data.Services)
         {
+            var flags = SecurityCatalog.AnalyzeCommand(service.PathName);
+
+            // Dịch vụ chạy bằng cmd/PowerShell/lệnh mã hóa (kiểu PsExec, Cobalt Strike) – kể cả khi tệp nằm trong thư mục Windows.
+            var viaWindowsTool = service.File is { Kind: PathKind.Windows } && (flags & suspicious) != 0
+                                 && !service.StartMode.Equals("Disabled", StringComparison.OrdinalIgnoreCase);
+            var thirdParty = service.AutoStart && service.File is { Kind: not PathKind.Windows };
+            if (!viaWindowsTool && !thirdParty) continue;
+
             data.Autostart.Add(new AutostartEntry
             {
                 Source = AutostartSource.Service,
@@ -210,7 +222,7 @@ public static partial class SecurityCollector
                 Command = service.PathName,
                 Location = service.Name,
                 ActionId = service.Name,
-                Flags = SecurityCatalog.AnalyzeCommand(service.PathName),
+                Flags = flags,
                 Target = service.File,
             });
         }

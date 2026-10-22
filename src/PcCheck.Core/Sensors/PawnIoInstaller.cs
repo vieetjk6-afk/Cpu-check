@@ -201,6 +201,7 @@ internal static class Authenticode
     private const uint RevokeNone = 0;
     private const uint ChoiceFile = 1;
     private const uint StateActionIgnore = 0;
+    private const uint CacheOnlyUrlRetrieval = 0x1000;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct WinTrustFileInfo
@@ -257,6 +258,7 @@ internal static class Authenticode
                 dwUnionChoice = ChoiceFile,
                 pFile = filePtr,
                 dwStateAction = StateActionIgnore,
+                dwProvFlags = CacheOnlyUrlRetrieval,
             };
             dataPtr = Marshal.AllocHGlobal(Marshal.SizeOf<WinTrustData>());
             Marshal.StructureToPtr(data, dataPtr, false);

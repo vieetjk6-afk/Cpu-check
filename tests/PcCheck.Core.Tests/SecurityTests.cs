@@ -386,6 +386,95 @@ public sealed class SecurityTests
         Assert.Equal(issues.OrderByDescending(i => i.Severity).Select(i => i.Id), issues.Select(i => i.Id));
     }
 
+    // ===== Hồi quy sau rà soát: tránh báo động nhầm =====
+
+    [Fact]
+    public void RemovedThreatsAreNotActive()
+    {
+        var data = Clean();
+        data.Security.Defender.Threats.Add(new ThreatEntry("PUA:Win32/Crack", 1, TestData.Now.AddDays(-5), [], Active: false));
+        data.Security.Defender.Threats.Add(new ThreatEntry("Hack:Win32/Keygen", 1, TestData.Now.AddDays(-4), [], Active: false, Allowed: true));
+        var threats = Report(data).Items.Where(i => i.Section == SecuritySectionKind.Defender && i.Id.StartsWith("secure/sec_threat/", StringComparison.Ordinal)).ToList();
+        Assert.Contains(threats, t => t.Severity == Severity.Info);
+        Assert.Contains(threats, t => t.Severity == Severity.Warning && t.Title.Key == "sec.threat.allowed");
+        Assert.DoesNotContain(threats, t => t.Severity == Severity.Critical);
+    }
+
+    [Fact]
+    public void LargeHostsFileIsSummarised()
+    {
+        var data = Clean();
+        for (var i = 0; i < 5000; i++) data.Security.Hosts.Add(new HostsEntry("0.0.0.0", $"ads{i}.example", i + 1));
+        data.Security.Hosts.Add(new HostsEntry("6.6.6.6", "vietcombank.com.vn", 5001));
+        var hosts = Report(data).Items.Where(i => i.Id.StartsWith("secure/sec_hosts/", StringComparison.Ordinal)).ToList();
+        Assert.Equal(2, hosts.Count);
+        Assert.Contains(hosts, h => h.Severity == Severity.Critical);
+        Assert.Contains(hosts, h => h.Id == "secure/sec_hosts/custom" && h.Severity == Severity.Info);
+    }
+
+    [Fact]
+    public void BypassListsForPopularSitesNeedReviewOnly()
+    {
+        Assert.Equal(SecurityCatalog.HostsVerdict.RedirectOther, SecurityCatalog.ClassifyHosts(new HostsEntry("140.82.112.3", "github.com", 1)));
+        Assert.Equal(SecurityCatalog.HostsVerdict.Normal, SecurityCatalog.ClassifyHosts(new HostsEntry("23.1.2.3", "steamcommunity.com", 2)));
+        Assert.Equal(SecurityCatalog.HostsVerdict.Normal, SecurityCatalog.ClassifyHosts(new HostsEntry("0.0.0.0", "google-analytics.com", 3)));
+    }
+
+    [Fact]
+    public void SimilarProductsAndGenericProcessNamesAreNotFlagged()
+    {
+        Assert.Null(SecurityCatalog.MatchProgram("LogMeIn Hamachi"));
+
+        var data = Clean();
+        data.Security.Processes.Add(new ProcessEntry { Pid = 600, Name = "kl.exe", File = File(@"C:\Program Files\Kodi\kl.exe", true) });
+        data.Security.Processes.Add(new ProcessEntry { Pid = 601, Name = "grabber.exe", File = File(@"D:\Video\grabber.exe", true) });
+        Assert.DoesNotContain(Report(data).Items, i => i.Section == SecuritySectionKind.Tools);
+
+        data.Security.Processes.Add(new ProcessEntry { Pid = 602, Name = "kl.exe", File = File(@"C:\Program Files (x86)\KidLogger\kl.exe", false) });
+        Assert.Contains(Report(data).Items, i => i.Id == "secure/sec_spyware/kidlogger");
+    }
+
+    [Fact]
+    public void SignedLookalikeInProgramFilesIsNotFlagged()
+    {
+        var data = Clean();
+        data.Security.Processes.Add(new ProcessEntry { Pid = 700, Name = "service.exe", File = File(@"C:\Program Files\Vendor\service.exe", true) });
+        Assert.DoesNotContain(Report(data).Items, i => i.Section == SecuritySectionKind.Processes);
+    }
+
+    [Fact]
+    public void MasqueradeIssueUsesItsOwnGuide()
+    {
+        var data = Clean();
+        data.Security.Processes.Add(new ProcessEntry { Pid = 800, Name = "lsass.exe", File = File(@"C:\ProgramData\lsass.exe", false) });
+        var issue = Assert.Single(SecurityAnalyzer.ToIssues(Report(data)), i => i.Id.Contains("masquerade", StringComparison.Ordinal));
+        Assert.Equal("sec_masquerade", IssueGuides.Find(issue.Id)!.Key);
+    }
+
+    [Fact]
+    public void CameraAppMovedByUpdateIsOnlyInfo()
+    {
+        var data = Clean();
+        var gone = new FileTrust(@"C:\Users\an\AppData\Local\Discord\app-1.0.9001\Discord.exe", false, null, "", "", PathKind.UserProfile);
+        data.Security.DeviceAccess.Add(new DeviceAccessEntry { Capability = "webcam", App = gone.Path, LastStart = TestData.Now.AddDays(-1), LastStop = TestData.Now.AddDays(-1), File = gone });
+        Assert.Equal(Severity.Info, Assert.Single(Report(data).Items, i => i.Section == SecuritySectionKind.DeviceAccess).Severity);
+    }
+
+    [Theory]
+    [InlineData("Vietnam National Root CA")]
+    [InlineData("VNPT Certification Authority")]
+    [InlineData("Viettel-CA")]
+    [InlineData("localhost")]
+    [InlineData("IIS Express Development Certificate")]
+    public void CommonLocalRootsAreKnown(string subject) =>
+        Assert.True(SecurityCatalog.IsKnownRoot(new CertificateEntry(subject, subject, "X", TestData.Now, "LocalMachine")));
+
+    [Theory]
+    [InlineData(@"C:\Tools\ProcessHacker.exe")]
+    [InlineData(@"C:\Program Files\SystemInformer\SystemInformer.exe")]
+    public void TaskManagerReplacementsAreInfo(string debugger) =>
+        Assert.Equal(Severity.Info, SecurityCatalog.ClassifyHijack(new HijackEntry(HijackKind.IfeoDebugger, "taskmgr.exe", debugger, "HKLM")));
+
     [Fact]
     public void StableHashIsDeterministic()
     {

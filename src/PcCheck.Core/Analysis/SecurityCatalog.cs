@@ -5,8 +5,11 @@ using PcCheck.Core.Models;
 
 namespace PcCheck.Core.Analysis;
 
-/// <summary>Phần mềm đã biết: tên hiển thị khi cài, tên tiến trình, tên dịch vụ.</summary>
-public sealed record KnownTool(string Key, string Name, SecurityToolKind Kind, string[] Programs, string[] Processes, string[] Services);
+/// <summary>Phần mềm đã biết: tên hiển thị khi cài, tên tiến trình, tên dịch vụ; Exclude = tên sản phẩm khác cùng hãng (không khớp).</summary>
+public sealed record KnownTool(string Key, string Name, SecurityToolKind Kind, string[] Programs, string[] Processes, string[] Services)
+{
+    public string[] Exclude { get; init; } = [];
+}
 
 /// <summary>Thư mục hệ thống dùng để phân loại đường dẫn (tách riêng để kiểm thử được).</summary>
 public sealed record PathContext(string Windows, string ProgramFiles, string ProgramFilesX86, string ProgramData, string Users, string Temp)
@@ -44,7 +47,7 @@ public static partial class SecurityCatalog
         R("hoptodesk", "HopToDesk", ["HopToDesk"], ["HopToDesk.exe"]),
         R("chrome_remote", "Chrome Remote Desktop", ["Chrome Remote Desktop Host"], ["remoting_host.exe"], ["chromoting"]),
         R("splashtop", "Splashtop", ["Splashtop Streamer"], ["SRService.exe", "SRServer.exe", "SRManager.exe"], ["SplashtopRemoteService"]),
-        R("logmein", "LogMeIn", ["LogMeIn"], ["LogMeIn.exe", "LMIGuardianSvc.exe", "LogMeInSystray.exe"], ["LogMeIn"]),
+        R("logmein", "LogMeIn", ["LogMeIn"], ["LogMeIn.exe", "LMIGuardianSvc.exe", "LogMeInSystray.exe"], ["LogMeIn"]) with { Exclude = ["Hamachi"] },
         R("goto", "GoTo / GoToMyPC", ["GoToMyPC", "GoTo Resolve", "GoToAssist"], ["g2comm.exe", "g2svc.exe", "GoToAssistService.exe"]),
         R("ammyy", "Ammyy Admin", ["Ammyy Admin"], ["AA_v3.exe", "AMMYY_Admin.exe"]),
         R("radmin", "Radmin", ["Radmin Server"], ["rserver3.exe"], ["RServer3"]),
@@ -126,14 +129,26 @@ public static partial class SecurityCatalog
     }
 
     public static KnownTool? MatchProgram(string programName) =>
-        Tools.FirstOrDefault(t => t.Programs.Any(p => ContainsWord(programName, p)));
+        Tools.FirstOrDefault(t => t.Programs.Any(p => ContainsWord(programName, p)) && !t.Exclude.Any(x => ContainsWord(programName, x)));
+
+    /// <summary>
+    /// Tên tiến trình/dịch vụ của phần mềm giám sát/gián điệp thường ngắn và chung chung (kl.exe, mpk.exe, grabber.exe...):
+    /// chỉ tin khi đường dẫn hoặc tên hãng cũng nhắc tới phần mềm đó. Phần mềm điều khiển từ xa có tên tiến trình đặc trưng.
+    /// </summary>
+    public static bool IsCorroborated(KnownTool tool, FileTrust? file)
+    {
+        if (tool.Kind == SecurityToolKind.RemoteAccess) return true;
+        if (file is null) return false;
+        var text = file.Path + " " + file.Publisher;
+        return tool.Programs.Any(p => ContainsWord(text, p)) || text.Contains(tool.Key, StringComparison.OrdinalIgnoreCase);
+    }
 
     public static KnownTool? MatchService(string name, string displayName, string imagePath)
     {
         var exe = Path.GetFileName(ExecutableOf(imagePath));
         return Tools.FirstOrDefault(t => t.Services.Any(s => s.Equals(name, StringComparison.OrdinalIgnoreCase)))
                ?? (exe.Length > 0 ? MatchProcess(exe) : null)
-               ?? Tools.FirstOrDefault(t => t.Programs.Any(p => ContainsWord(displayName, p)));
+               ?? Tools.FirstOrDefault(t => t.Programs.Any(p => ContainsWord(displayName, p)) && !t.Exclude.Any(x => ContainsWord(displayName, x)));
     }
 
     /// <summary>Khớp nguyên cụm từ (không khớp "Inspector" với "Spector").</summary>
@@ -306,8 +321,11 @@ public static partial class SecurityCatalog
         /// <summary>Chặn tên miền cập nhật Windows / diệt virus (vd trỏ về 0.0.0.0).</summary>
         BlocksSecurity,
 
-        /// <summary>Chuyển hướng tên miền quan trọng (ngân hàng, Google, Microsoft...) tới máy chủ khác – có thể là lừa đảo.</summary>
+        /// <summary>Chuyển hướng trang ngân hàng / ví / đăng nhập / diệt virus tới máy chủ khác – có thể là trang giả.</summary>
         Redirect,
+
+        /// <summary>Chuyển hướng trang phổ biến khác (vd danh sách "tăng tốc GitHub/YouTube") – cần xem lại.</summary>
+        RedirectOther,
     }
 
     private static readonly string[] SecurityDomains =
@@ -317,12 +335,19 @@ public static partial class SecurityCatalog
         "mcafee.com", "norton.com", "symantec.com", "trendmicro", "sophos.com", "virustotal.com", "bkav.com", "f-secure.com",
     ];
 
-    private static readonly string[] SensitiveDomains =
+    /// <summary>Ngân hàng, ví điện tử, tài khoản đăng nhập: chuyển hướng = nguy hiểm.</summary>
+    private static readonly string[] CriticalDomains =
     [
-        "microsoft.com", "live.com", "outlook.com", "office.com", "google.com", "gmail.com", "youtube.com", "facebook.com",
-        "messenger.com", "instagram.com", "zalo.me", "apple.com", "icloud.com", "paypal.com", "github.com",
-        "vietcombank.com.vn", "techcombank.com", "techcombank.com.vn", "bidv.com.vn", "vietinbank.vn", "agribank.com.vn",
-        "vpbank.com.vn", "mbbank.com.vn", "acb.com.vn", "tpb.vn", "sacombank.com", "shb.com.vn", "momo.vn", "zalopay.vn",
+        "microsoft.com", "live.com", "outlook.com", "google.com", "gmail.com", "facebook.com", "apple.com", "icloud.com",
+        "paypal.com", "vietcombank.com.vn", "techcombank.com", "techcombank.com.vn", "bidv.com.vn", "vietinbank.vn",
+        "agribank.com.vn", "vpbank.com.vn", "mbbank.com.vn", "acb.com.vn", "tpb.vn", "sacombank.com", "shb.com.vn",
+        "momo.vn", "zalopay.vn",
+    ];
+
+    /// <summary>Trang phổ biến khác: chuyển hướng cần xem lại (danh sách "tăng tốc" GitHub/YouTube hay sửa hosts hợp lệ).</summary>
+    private static readonly string[] OtherSensitiveDomains =
+    [
+        "office.com", "youtube.com", "messenger.com", "instagram.com", "zalo.me", "github.com", "githubusercontent.com",
     ];
 
     public static HostsVerdict ClassifyHosts(HostsEntry entry)
@@ -331,9 +356,12 @@ public static partial class SecurityCatalog
         var blocked = IsBlackhole(entry.Address);
         var security = SecurityDomains.Any(d => host == d || host.EndsWith("." + d, StringComparison.Ordinal) || (d.IndexOf('.') < 0 && host.Contains(d, StringComparison.Ordinal)));
         if (security && blocked) return HostsVerdict.BlocksSecurity;
-        var sensitive = security || SensitiveDomains.Any(d => host == d || host.EndsWith("." + d, StringComparison.Ordinal));
-        return sensitive && !blocked ? HostsVerdict.Redirect : HostsVerdict.Normal;
+        if (blocked) return HostsVerdict.Normal;
+        if (security || CriticalDomains.Any(d => Matches(host, d))) return HostsVerdict.Redirect;
+        return OtherSensitiveDomains.Any(d => Matches(host, d)) ? HostsVerdict.RedirectOther : HostsVerdict.Normal;
     }
+
+    private static bool Matches(string host, string domain) => host == domain || host.EndsWith("." + domain, StringComparison.Ordinal);
 
     private static bool IsBlackhole(string address) =>
         address is "0.0.0.0" or "::" or "::1" or "0" || address.StartsWith("127.", StringComparison.Ordinal);
@@ -409,11 +437,19 @@ public static partial class SecurityCatalog
         "Microsoft", "Kaspersky", "ESET", "Avast", "AVG", "Bitdefender", "Norton", "Fiddler", "Sophos", "Fortinet", "Zscaler",
         "Cisco Umbrella", "Netskope", "Palo Alto", "Check Point", "Trend Micro", "McAfee", "Malwarebytes", "Adguard", "Thawte",
         "VeriSign", "Symantec", "DigiCert", "GlobalSign", "Sectigo", "Entrust", "GoDaddy", "Let's Encrypt", "ISRG", "Baltimore",
+
+        // CA chữ ký số Việt Nam (cài cùng phần mềm token USB / khai thuế điện tử).
+        "Vietnam National", "VNPT", "Viettel", "BKAV", "FPT", "MISA", "NewCA", "SmartSign", "Nacencomm", "EFY", "WINCA",
+        "SAFE-CA", "TrustCA", "EasyCA", "LCS-CA", "VINA-CA", "CMC CA", "Bộ Tài chính",
+
+        // Chứng chỉ phát triển trên máy (IIS Express, dotnet dev-certs).
+        "IIS Express", "ASP.NET Core HTTPS development",
     ];
 
     /// <summary>Chứng chỉ gốc do phần mềm diệt virus / công ty / CA lớn thêm – thường hợp lệ (chỉ hiển thị, không cảnh báo).</summary>
     public static bool IsKnownRoot(CertificateEntry cert) =>
-        KnownRootMarkers.Any(m => cert.Subject.Contains(m, StringComparison.OrdinalIgnoreCase) || cert.Issuer.Contains(m, StringComparison.OrdinalIgnoreCase));
+        cert.Subject.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+        || KnownRootMarkers.Any(m => cert.Subject.Contains(m, StringComparison.OrdinalIgnoreCase) || cert.Issuer.Contains(m, StringComparison.OrdinalIgnoreCase));
 
     // ===== Hijack =====
 
@@ -443,11 +479,12 @@ public static partial class SecurityCatalog
                 return string.IsNullOrWhiteSpace(entry.Value) ? Severity.Ok : Severity.Warning;
             default:
                 var value = entry.Value.ToLowerInvariant();
-                if (AccessibilityExes.Contains(entry.Target) || SecurityExes.Contains(entry.Target) && !value.Contains("procexp", StringComparison.Ordinal))
-                    return Severity.Critical;
-                return value.Contains("vsjitdebugger", StringComparison.Ordinal) || value.Contains("procexp", StringComparison.Ordinal) || value.Contains("windbg", StringComparison.Ordinal)
-                    ? Severity.Info
-                    : Severity.Warning;
+
+                // Công cụ hợp lệ thay Task Manager / gỡ lỗi: Process Explorer, Process Hacker, System Informer, VS, WinDbg.
+                var knownTool = new[] { "procexp", "processhacker", "systeminformer", "vsjitdebugger", "windbg" }.Any(t => value.Contains(t, StringComparison.Ordinal));
+                if (AccessibilityExes.Contains(entry.Target)) return Severity.Critical;
+                if (knownTool) return Severity.Info;
+                return SecurityExes.Contains(entry.Target) ? Severity.Critical : Severity.Warning;
         }
     }
 

@@ -17,7 +17,7 @@ public static partial class SecurityCollector
             .ToList();
 
         // Nhóm Administrators theo SID (tên nhóm khác nhau theo ngôn ngữ Windows).
-        var group = Wmi.First("SELECT Name, Domain FROM Win32_Group WHERE SID='S-1-5-32-544'", Wmi.Cimv2, 10);
+        var group = Wmi.First("SELECT Name, Domain FROM Win32_Group WHERE LocalAccount=True AND SID='S-1-5-32-544'", Wmi.Cimv2, 15);
         if (group is not null)
         {
             var members = Wmi.Query(

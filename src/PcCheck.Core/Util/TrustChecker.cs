@@ -42,6 +42,10 @@ public static class TrustChecker
             {
                 signed = Authenticode.IsTrusted(path);
                 if (signed == true) signer = SignerOf(path);
+
+                // Tệp Microsoft ký qua catalog (vd Program Files\Windows Defender, TabTip): WinVerifyTrust trên tệp báo sai.
+                // Chỉ áp dụng cho Program Files (người dùng thường không ghi được) để không bị giả mạo tên hãng.
+                else if (kind == PathKind.ProgramFiles && company.StartsWith("Microsoft", StringComparison.OrdinalIgnoreCase)) signed = null;
             }
 
             var trust = new FileTrust(path, true, signed, signer, company, kind);

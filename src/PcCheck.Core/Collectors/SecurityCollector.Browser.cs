@@ -60,6 +60,24 @@ public static partial class SecurityCollector
         var forced = policies.Where(p => p.Name == "ExtensionInstallForcelist")
             .Select(p => (p.Browser, Id: p.Value.Split(';')[0].Trim()))
             .ToHashSet();
+
+        // Chính sách ExtensionSettings (JSON): installation_mode = force_installed / normal_installed.
+        foreach (var policy in policies.Where(p => p.Name == "ExtensionSettings"))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(policy.Value);
+                foreach (var ext in doc.RootElement.EnumerateObject())
+                {
+                    if (ext.Value.ValueKind == JsonValueKind.Object && ext.Value.TryGetProperty("installation_mode", out var mode)
+                        && mode.GetString() is "force_installed" or "normal_installed")
+                        forced.Add((policy.Browser, ext.Name));
+                }
+            }
+            catch (JsonException)
+            {
+            }
+        }
         var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var list = new List<BrowserExtension>();
 

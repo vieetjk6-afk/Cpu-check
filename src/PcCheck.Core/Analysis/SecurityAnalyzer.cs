@@ -86,10 +86,12 @@ public static class SecurityAnalyzer
         foreach (var tool in SecurityCatalog.Tools)
         {
             var programs = data.Programs.Where(p => SecurityCatalog.MatchProgram(p.Name) == tool).ToList();
-            var running = security.Processes.Where(p => SecurityCatalog.MatchProcess(p.Name) == tool).ToList();
-            var services = security.Services.Where(s => SecurityCatalog.MatchService(s.Name, s.DisplayName, s.PathName) == tool).ToList();
+            var running = security.Processes.Where(p => SecurityCatalog.MatchProcess(p.Name) == tool && (programs.Count > 0 || SecurityCatalog.IsCorroborated(tool, p.File))).ToList();
+            var services = security.Services.Where(s => SecurityCatalog.MatchService(s.Name, s.DisplayName, s.PathName) == tool
+                                                        && (programs.Count > 0 || tool.Services.Contains(s.Name, StringComparer.OrdinalIgnoreCase) || SecurityCatalog.IsCorroborated(tool, s.File))).ToList();
             var autostart = security.Autostart.Where(a =>
-                    a.Enabled && (a.Target is { } t && SecurityCatalog.MatchProcess(Path.GetFileName(t.Path)) == tool || tool.Programs.Any(p => SecurityCatalog.ContainsWord(a.Name, p))))
+                    a.Enabled && (a.Target is { } t && SecurityCatalog.MatchProcess(Path.GetFileName(t.Path)) == tool && (programs.Count > 0 || SecurityCatalog.IsCorroborated(tool, t))
+                                  || tool.Programs.Any(p => SecurityCatalog.ContainsWord(a.Name, p)) && !tool.Exclude.Any(x => SecurityCatalog.ContainsWord(a.Name, x))))
                 .ToList();
             if (programs.Count == 0 && running.Count == 0 && services.Count == 0 && autostart.Count == 0) continue;
 
@@ -146,7 +148,8 @@ public static class SecurityAnalyzer
         {
             var name = entry.Packaged ? entry.App.Split('_')[0] : Path.GetFileName(entry.App);
             var file = entry.File;
-            var unknown = !entry.Packaged && (file is null || !file.Exists || file.Signed == false || (file.UserWritable && file.Signed != true));
+            // Tệp không còn (ứng dụng cập nhật sang thư mục phiên bản mới, vd WebView2, Discord) chỉ là thông tin.
+            var unknown = !entry.Packaged && file is { Exists: true } && (file.Signed == false || (file.UserWritable && file.Signed != true));
             var recent = entry.LastStart is { } start && now - start < TimeSpan.FromDays(7);
             var severity = unknown && (entry.InUse || recent) ? Severity.Warning : Severity.Info;
 
@@ -260,7 +263,7 @@ public static class SecurityAnalyzer
             string reason;
             if (SecurityCatalog.IsMasquerade(first.Name, file))
                 (severity, reason) = (Severity.Critical, "masquerade");
-            else if (SecurityCatalog.IsLookalike(first.Name))
+            else if (SecurityCatalog.IsLookalike(first.Name) && (file.Signed != true || file.UserWritable))
                 (severity, reason) = (Severity.Warning, "lookalike");
             else if (file.Kind == PathKind.Temp && file.Signed != true)
                 (severity, reason) = (Severity.Warning, "temp");
@@ -277,9 +280,10 @@ public static class SecurityAnalyzer
             var actions = new List<SecurityAction>();
             AddFileActions(actions, file.Path);
 
+            var guide = reason == "masquerade" ? "sec_masquerade" : "sec_process";
             yield return new SecurityItem
             {
-                Id = $"secure/sec_process/{StableHash(file.Path)}",
+                Id = $"secure/{guide}/{StableHash(file.Path)}",
                 Section = SecuritySectionKind.Processes,
                 Severity = severity,
                 Title = L("sec.process.title", first.Name),
@@ -287,7 +291,7 @@ public static class SecurityAnalyzer
                 Evidence = file.Path,
                 Tags = tags,
                 Actions = actions,
-                GuideKey = reason == "masquerade" ? "sec_masquerade" : "sec_process",
+                GuideKey = guide,
             };
         }
     }
@@ -448,24 +452,46 @@ public static class SecurityAnalyzer
             };
         }
 
+        // Tệp hosts có thể chứa hàng chục nghìn dòng (danh sách chặn quảng cáo): chỉ liệt kê riêng các dòng đáng ngờ,
+        // phần còn lại gộp thành một mục.
         var hostsFile = Path.Combine(Environment.SystemDirectory, "drivers", "etc", "hosts");
+        var openHosts = new SecurityAction(SecurityActionKind.OpenFile, hostsFile, L("sec.action.open_hosts"));
+        var normal = new List<HostsEntry>();
+        var listed = 0;
         foreach (var entry in security.Hosts)
         {
             var verdict = SecurityCatalog.ClassifyHosts(entry);
+            if (verdict == SecurityCatalog.HostsVerdict.Normal || listed >= 50)
+            {
+                normal.Add(entry);
+                continue;
+            }
+
+            listed++;
             yield return new SecurityItem
             {
                 Id = $"secure/sec_hosts/{StableHash(entry.Host + entry.Address)}",
                 Section = SecuritySectionKind.Certificates,
-                Severity = verdict switch
-                {
-                    SecurityCatalog.HostsVerdict.Redirect => Severity.Critical,
-                    SecurityCatalog.HostsVerdict.BlocksSecurity => Severity.Warning,
-                    _ => Severity.Info,
-                },
+                Severity = verdict == SecurityCatalog.HostsVerdict.Redirect ? Severity.Critical : Severity.Warning,
                 Title = L("sec.hosts.title", entry.Host, entry.Address),
                 Detail = L("sec.hosts." + verdict.ToString().ToLowerInvariant()),
                 Evidence = $"hosts:{entry.Line}",
-                Actions = [new SecurityAction(SecurityActionKind.OpenFile, hostsFile, L("sec.action.open_hosts"))],
+                Actions = [openHosts],
+                GuideKey = "sec_hosts",
+            };
+        }
+
+        if (normal.Count > 0)
+        {
+            yield return new SecurityItem
+            {
+                Id = "secure/sec_hosts/custom",
+                Section = SecuritySectionKind.Certificates,
+                Severity = Severity.Info,
+                Title = L("sec.hosts.custom", normal.Count),
+                Detail = L("sec.hosts.normal"),
+                Evidence = string.Join(", ", normal.Take(5).Select(e => $"{e.Host} → {e.Address}")) + (normal.Count > 5 ? ", …" : ""),
+                Actions = [openHosts],
                 GuideKey = "sec_hosts",
             };
         }
@@ -488,8 +514,8 @@ public static class SecurityAnalyzer
             {
                 Id = $"secure/sec_threat/{StableHash(threat.Name + threat.Time)}",
                 Section = SecuritySectionKind.Defender,
-                Severity = threat.Active ? Severity.Critical : Severity.Info,
-                Title = L(threat.Active ? "sec.threat.active" : "sec.threat.resolved", threat.Name),
+                Severity = threat.Active ? Severity.Critical : threat.Allowed ? Severity.Warning : Severity.Info,
+                Title = L(threat.Active ? "sec.threat.active" : threat.Allowed ? "sec.threat.allowed" : "sec.threat.resolved", threat.Name),
                 Detail = threat.Time is { } time ? L("sec.threat.time", time) : null,
                 Evidence = string.Join(" | ", threat.Resources),
                 Actions = [new SecurityAction(SecurityActionKind.OpenUri, "windowsdefender://threat", L("sec.action.defender_history"))],

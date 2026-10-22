@@ -198,7 +198,8 @@ public sealed class DeviceAccessEntry
     public bool InUse => LastStart is not null && LastStop is null;
 }
 
-public sealed record ThreatEntry(string Name, int SeverityId, DateTime? Time, IReadOnlyList<string> Resources, bool Active);
+/// <param name="Allowed">Người dùng đã chọn "Allow on device" – mối đe dọa được để lại trên máy.</param>
+public sealed record ThreatEntry(string Name, int SeverityId, DateTime? Time, IReadOnlyList<string> Resources, bool Active, bool Allowed = false);
 
 public sealed class DefenderInfo
 {
