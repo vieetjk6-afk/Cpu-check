@@ -156,10 +156,13 @@
                 </Style>
             </Border.Style>
             <Grid>
+            <!-- Danh sách phần mềm (ẩn khi đang có phiên gỡ sạch) -->
+            <Grid Visibility="{Binding Session, Converter={StaticResource EmptyToCollapsed}, ConverterParameter=invert}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid Margin="16,16,16,8">
                     <Grid.ColumnDefinitions>
@@ -188,19 +191,33 @@
                         </StackPanel>
                     </Button>
                 </Grid>
-                <TextBlock Grid.Row="1" Text="{Binding ProgramsSummary}" Style="{StaticResource Caption}" Margin="20,0,20,8" />
-                <ListBox Grid.Row="2" Style="{StaticResource PlainList}" ItemsSource="{Binding Programs}" Margin="4,0,4,8">
+                <Grid Grid.Row="1" Margin="20,0,16,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding ProgramsSummary}" Style="{StaticResource Caption}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0">
+                        <Button Style="{StaticResource LinkButton}" Content="{l:T uninstall.select_suggested}" Command="{Binding SelectSuggestedCommand}" />
+                        <Button Style="{StaticResource LinkButton}" Content="{l:T uninstall.select_none}" Command="{Binding ClearSelectionCommand}" Margin="12,0,0,0"
+                                Visibility="{Binding SelectedProgramCount, Converter={StaticResource EmptyToCollapsed}}" />
+                    </StackPanel>
+                </Grid>
+                <ListBox Grid.Row="2" Style="{StaticResource PlainList}" ItemsSource="{Binding Programs}" Margin="4,0,4,0">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="16,10">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="90" />
                                         <ColumnDefinition Width="130" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Margin="0,0,12,0">
+                                    <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,12,0"
+                                              ToolTip="{l:T uninstall.select_tip}" />
+                                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="{Binding Name}" Style="{StaticResource H3}" FontWeight="Normal" MaxWidth="420" />
                                             <Border Style="{StaticResource Badge}" Margin="10,0,0,0" Padding="8,1"
@@ -214,15 +231,15 @@
                                             <Run Text="{Binding Publisher, Mode=OneWay}" /> · <Run Text="{Binding Version, Mode=OneWay}" /> · <Run Text="{l:T software.installed}" /> <Run Text="{Binding Installed, Mode=OneWay}" />
                                         </TextBlock>
                                     </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="{Binding Size}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" />
-                                    <TextBlock Grid.Column="2" Text="{Binding LastUsed}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                                    <Button Grid.Column="3" Style="{StaticResource GhostButton}" VerticalAlignment="Center"
+                                    <TextBlock Grid.Column="2" Text="{Binding Size}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <TextBlock Grid.Column="3" Text="{Binding LastUsed}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                    <Button Grid.Column="4" Style="{StaticResource GhostButton}" VerticalAlignment="Center"
                                             Command="{Binding DataContext.UninstallCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}">
+                                            CommandParameter="{Binding}" ToolTip="{l:T uninstall.row_tip}">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Style="{StaticResource Icon}" Text="&#xE74D;" FontSize="13"
                                                        Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                            <TextBlock Text="{l:T software.uninstall}" Margin="6,0,0,0" />
+                                            <TextBlock Text="{l:T uninstall.clean}" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </Button>
                                 </Grid>
@@ -230,6 +247,166 @@
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
+
+                <!-- Thanh gỡ hàng loạt -->
+                <Border Grid.Row="3" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="20,12,16,14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="{Binding SelectionText}" Style="{StaticResource Body}" TextWrapping="Wrap" />
+                            <WrapPanel Margin="0,8,0,0">
+                                <CheckBox IsChecked="{Binding QuietUninstall}" Content="{l:T uninstall.opt_quiet}" ToolTip="{l:T uninstall.opt_quiet_tip}" Margin="0,0,20,4" />
+                                <CheckBox IsChecked="{Binding CreateRestorePoint}" Content="{l:T uninstall.opt_restore}" ToolTip="{l:T uninstall.opt_restore_tip}" Margin="0,0,0,4" />
+                            </WrapPanel>
+                        </StackPanel>
+                        <Button Grid.Column="1" Style="{StaticResource DangerButton}" VerticalAlignment="Center" Command="{Binding UninstallSelectedCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE74D;" FontSize="14"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                <TextBlock Text="{l:T uninstall.selected_button}" Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Phiên gỡ sạch: gỡ lần lượt → quét phần còn sót → chọn và xóa -->
+            <Grid DataContext="{Binding Session}"
+                  Visibility="{Binding DataContext.Session, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource EmptyToCollapsed}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Margin="20,18,20,10">
+                    <TextBlock Text="{Binding Title}" Style="{StaticResource H2}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding ProgressText}" Style="{StaticResource Caption}" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding ProgressText}" Visibility="{Binding ProgressText, Converter={StaticResource EmptyToCollapsed}}" />
+                    <ProgressBar IsIndeterminate="True" Height="4" Margin="0,10,0,0"
+                                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
+                </StackPanel>
+
+                <!-- Các phần mềm trong phiên -->
+                <ScrollViewer Grid.Row="1" MaxHeight="210" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="4,0,4,8">
+                    <ItemsControl ItemsSource="{Binding Steps}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="16,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Style="{StaticResource Icon}" Text="{Binding Glyph}" FontSize="14" Margin="0,0,12,0"
+                                                   Foreground="{Binding Severity, Converter={StaticResource SeverityBrush}}" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="2" Text="{Binding StatusText}" Style="{StaticResource Caption}" VerticalAlignment="Center" Margin="12,0,0,0"
+                                                   Foreground="{Binding Severity, Converter={StaticResource SeverityBrush}}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <Grid Grid.Row="2">
+                    <!-- Phần còn sót -->
+                    <Grid Visibility="{Binding ShowLeftovers, Converter={StaticResource BoolToVis}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid Margin="20,4,16,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{l:T uninstall.leftovers_hint}" Style="{StaticResource Caption}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0">
+                                <Button Style="{StaticResource LinkButton}" Content="{l:T common.select_all}" Command="{Binding SelectAllCommand}" />
+                                <Button Style="{StaticResource LinkButton}" Content="{l:T uninstall.select_none}" Command="{Binding SelectNoneCommand}" Margin="12,0,0,0" />
+                            </StackPanel>
+                        </Grid>
+                        <ListBox Grid.Row="1" Style="{StaticResource PlainList}" ItemsSource="{Binding Leftovers}" Margin="4,0,4,0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="16,8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                            <TextBlock Grid.Column="1" Style="{StaticResource Icon}" Text="{Binding Glyph}" FontSize="15" Margin="0,0,12,0"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                                            <StackPanel Grid.Column="2" Margin="0,0,12,0">
+                                                <TextBlock Text="{Binding Path}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Path}" />
+                                                <TextBlock Style="{StaticResource Caption}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
+                                                    <Run Text="{Binding KindText, Mode=OneWay}" /> · <Run Text="{Binding Program, Mode=OneWay}" /> · <Run Text="{Binding Reason, Mode=OneWay}" />
+                                                </TextBlock>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="3" Text="{Binding Size}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,8,0" />
+                                            <Button Grid.Column="4" Style="{StaticResource GhostButton}" VerticalAlignment="Center" ToolTip="{l:T uninstall.open}"
+                                                    Visibility="{Binding CanOpen, Converter={StaticResource BoolToVis}}"
+                                                    Command="{Binding DataContext.OpenItemCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                    CommandParameter="{Binding}">
+                                                <TextBlock Style="{StaticResource Icon}" Text="&#xE8DA;" FontSize="13"
+                                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+
+                    <!-- Kết quả -->
+                    <Border Style="{StaticResource SubCard}" Margin="20,4,20,8" VerticalAlignment="Top"
+                            Visibility="{Binding ResultText, Converter={StaticResource EmptyToCollapsed}}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding ResultText}" Style="{StaticResource Body}" TextWrapping="Wrap" />
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0" Visibility="{Binding BackupFolder, Converter={StaticResource EmptyToCollapsed}}">
+                                <TextBlock Text="{l:T uninstall.backup_hint}" Style="{StaticResource Caption}" VerticalAlignment="Center" />
+                                <Button Style="{StaticResource LinkButton}" Content="{l:T uninstall.open_backup}" Command="{Binding OpenBackupCommand}" Margin="8,0,0,0" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Nút điều khiển: chỉ hiện nút dùng được ở giai đoạn hiện tại -->
+                <Border Grid.Row="3" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="20,12,16,14">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <StackPanel.Resources>
+                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                    <Setter Property="Margin" Value="8,0,0,0" />
+                                    <Setter Property="Visibility" Value="{Binding IsEnabled, RelativeSource={RelativeSource Self}, Converter={StaticResource BoolToVis}}" />
+                                </Style>
+                            </StackPanel.Resources>
+                            <Button Content="{l:T uninstall.skip_wait}" ToolTip="{l:T uninstall.skip_wait_tip}" Command="{Binding SkipWaitCommand}" />
+                            <Button Content="{l:T uninstall.stop}" ToolTip="{l:T uninstall.stop_tip}" Command="{Binding StopCommand}" />
+                            <Button Content="{l:T uninstall.keep}" Command="{Binding SkipLeftoversCommand}" />
+                            <Button Style="{StaticResource DangerButton}" Margin="8,0,0,0" Command="{Binding RemoveCommand}"
+                                    Visibility="{Binding ShowLeftovers, Converter={StaticResource BoolToVis}}">
+                                <TextBlock>
+                                    <Run Text="{l:T uninstall.remove}" /> (<Run Text="{Binding SelectedCount, Mode=OneWay}" />)
+                                </TextBlock>
+                            </Button>
+                            <Button Style="{StaticResource PrimaryButton}" Margin="8,0,0,0" Content="{l:T common.close}" Command="{Binding CloseCommand}"
+                                    Visibility="{Binding IsEnabled, RelativeSource={RelativeSource Self}, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
             </Grid>
         </Border>
 

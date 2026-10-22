@@ -219,6 +219,29 @@
                         <Button Command="{Binding OfflineScanCommand}" Content="{l:T sec.scan_offline}" Margin="0,0,10,8" ToolTip="{l:T sec.scan_offline_tip}" />
                         <Button Style="{StaticResource GhostButton}" Command="{Binding OpenDefenderCommand}" Content="{l:T sec.open_defender}" Margin="0,0,10,8" />
                     </WrapPanel>
+
+                    <!-- Đang quét -->
+                    <Border Style="{StaticResource SubCard}" Margin="0,4,0,0" Visibility="{Binding IsDefenderScanning, Converter={StaticResource BoolToVis}}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding ScanStatus}" Style="{StaticResource H3}" FontSize="13.5" />
+                                <TextBlock Text="{l:T sec.scan.running_hint}" Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap" TextTrimming="None" />
+                                <ProgressBar IsIndeterminate="True" Height="4" Margin="0,8,0,0" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Command="{Binding StopScanCommand}" Content="{l:T sec.scan.stop}" Margin="14,0,0,0" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Kết quả lần quét gần nhất -->
+                    <StackPanel Orientation="Horizontal" Margin="2,6,0,0" Visibility="{Binding LastScanResult, Converter={StaticResource EmptyToCollapsed}}">
+                        <TextBlock Style="{StaticResource Icon}" FontSize="14" Text="{Binding LastScanSeverity, Converter={StaticResource SeverityGlyph}}"
+                                   Foreground="{Binding LastScanSeverity, Converter={StaticResource SeverityBrush}}" />
+                        <TextBlock Text="{Binding LastScanResult}" Style="{StaticResource Body}" Margin="8,0,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

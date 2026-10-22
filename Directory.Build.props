@@ -6,9 +6,10 @@
     <!-- Cho phép build (không chạy) ứng dụng Windows trên Linux/macOS, ví dụ trong CI. -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Version>1.0.0</Version>
-    <Company>PC Check</Company>
+    <Authors>vieetjk</Authors>
+    <Company>vieetjk</Company>
     <Product>PC Check</Product>
-    <Copyright>© 2026 PC Check</Copyright>
+    <Copyright>© 2026 vieetjk</Copyright>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <SatelliteResourceLanguages>en;vi</SatelliteResourceLanguages>
   </PropertyGroup>

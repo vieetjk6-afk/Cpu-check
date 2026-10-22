@@ -82,6 +82,7 @@ public sealed class MainViewModel : ObservableObject
             new(Pages.Issues, "nav.issues", "", Issues),
             new(Pages.Security, "nav.security", "\uEA18", Security),
             new(Pages.Widget, "nav.widget", "\uE718", Widget),
+            new(Pages.Update, "nav.update", "\uE895", Updates),
         ];
         SettingsNav = new NavItem(Pages.Settings, "nav.settings", "", Settings);
         _selectedNav = NavItems[0];
@@ -260,6 +261,14 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
+        // Kiểm tra ổ đĩa chạy ngay trong ứng dụng (chỉ đọc, không cần xác nhận) thay cho cửa sổ chkdsk.
+        if (action.Kind == FixKind.RunTool && action.Arg?.Split(':')[0] == SystemTools.Chkdsk)
+        {
+            var parts = action.Arg.Split(':');
+            await CheckDiskAsync(parts.Length > 1 ? parts[1] : null);
+            return;
+        }
+
         if (action.Kind == FixKind.RunTool && action.Arg == SystemTools.CpuSensor && (_installingCpuSensor || PawnIoInstaller.IsRunning))
         {
             ShowToast(Loc.T("cpu_sensor.busy"));
@@ -394,6 +403,59 @@ public sealed class MainViewModel : ObservableObject
     public bool IsToastVisible { get => _isToastVisible; private set => Set(ref _isToastVisible, value); }
     public bool ToastIsError { get => _toastIsError; private set => Set(ref _toastIsError, value); }
     public RelayCommand CloseToastCommand { get; }
+
+    // ---------- Tác vụ chạy nền (kiểm tra ổ đĩa, quét virus) ----------
+    private string _activityText = "";
+    private bool _checkingDisk;
+
+    /// <summary>Dòng trạng thái ở thanh bên khi có tác vụ dài đang chạy.</summary>
+    public string ActivityText { get => _activityText; set => Set(ref _activityText, value); }
+
+    /// <summary>Kiểm tra lỗi hệ thống tệp (Repair-Volume / chkdsk), báo kết quả và đề nghị sửa nếu có lỗi.</summary>
+    public async Task CheckDiskAsync(string? drive)
+    {
+        var letter = DiskChecker.Normalize(drive);
+        if (_checkingDisk)
+        {
+            ShowToast(Loc.T("disk_check.busy"));
+            return;
+        }
+
+        _checkingDisk = true;
+        ActivityText = Loc.F("disk_check.running", letter);
+        ShowToast(Loc.F("disk_check.started", letter));
+        try
+        {
+            var result = await DiskChecker.ScanAsync(letter);
+            switch (result.Status)
+            {
+                case DiskCheckStatus.Healthy:
+                    ShowToast(Loc.F("disk_check.healthy", letter));
+                    break;
+                case DiskCheckStatus.ErrorsFound:
+                    if (await ConfirmAsync(Loc.T("disk_check.title"), Loc.F("disk_check.errors", letter), Loc.T("disk_check.repair")))
+                    {
+                        var repair = await DiskChecker.RepairAsync(letter);
+                        ShowToast(repair.Message.ToString(), !repair.Success);
+                    }
+
+                    break;
+                default:
+                    ShowToast(Loc.F("disk_check.failed", letter), true);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Kiểm tra ổ đĩa lỗi", ex);
+            ShowToast(Loc.F("disk_check.failed", letter), true);
+        }
+        finally
+        {
+            _checkingDisk = false;
+            ActivityText = "";
+        }
+    }
 
     public void ShowToast(string text, bool isError = false)
     {

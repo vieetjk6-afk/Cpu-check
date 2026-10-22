@@ -238,6 +238,7 @@
             <DataTemplate DataType="{x:Type vm:SecurityViewModel}"><views:SecurityView /></DataTemplate>
             <DataTemplate DataType="{x:Type vm:SettingsViewModel}"><views:SettingsView /></DataTemplate>
             <DataTemplate DataType="{x:Type vm:WidgetViewModel}"><views:WidgetView /></DataTemplate>
+            <DataTemplate DataType="{x:Type vm:UpdateViewModel}"><views:UpdateView /></DataTemplate>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

@@ -503,10 +503,32 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ProgressBar">
-                    <Grid>
+                    <Grid ClipToBounds="True">
                         <Border x:Name="PART_Track" CornerRadius="3" Background="{TemplateBinding Background}" />
                         <Border x:Name="PART_Indicator" CornerRadius="3" Background="{TemplateBinding Foreground}" HorizontalAlignment="Left" />
+                        <!-- Chế độ không xác định (IsIndeterminate): một vệt chạy qua lại -->
+                        <Border x:Name="Pulse" Width="80" CornerRadius="3" Background="{TemplateBinding Foreground}" HorizontalAlignment="Left" Visibility="Collapsed">
+                            <Border.RenderTransform>
+                                <TranslateTransform x:Name="PulseShift" X="-80" />
+                            </Border.RenderTransform>
+                        </Border>
                     </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsIndeterminate" Value="True">
+                            <Setter TargetName="PART_Indicator" Property="Visibility" Value="Collapsed" />
+                            <Setter TargetName="Pulse" Property="Visibility" Value="Visible" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard x:Name="PulseAnimation">
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimation Storyboard.TargetName="PulseShift" Storyboard.TargetProperty="X" From="-80" To="900" Duration="0:0:2.2" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <StopStoryboard BeginStoryboardName="PulseAnimation" />
+                            </Trigger.ExitActions>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

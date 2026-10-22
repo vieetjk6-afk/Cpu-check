@@ -55,10 +55,14 @@ public enum ProgramTag
     Store,
 }
 
-public sealed class ProgramItem
+public sealed class ProgramItem : ObservableObject
 {
-    public ProgramItem(InstalledProgram p, DateTime now)
+    private readonly Action? _changed;
+    private bool _isSelected;
+
+    public ProgramItem(InstalledProgram p, DateTime now, Action? changed = null)
     {
+        _changed = changed;
         Program = p;
         Name = p.Name;
         Publisher = Format.OrDash(p.Publisher);
@@ -103,6 +107,16 @@ public sealed class ProgramItem
     public Severity Severity { get; }
     public bool IsSuggested => Tag is ProgramTag.Bloat or ProgramTag.Store or ProgramTag.Unused;
     public string SearchText { get; }
+
+    /// <summary>Được chọn để gỡ sạch hàng loạt.</summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (Set(ref _isSelected, value)) _changed?.Invoke();
+        }
+    }
 }
 
 public sealed class StartupRow : ObservableObject
@@ -161,7 +175,17 @@ public sealed class CleanupViewModel : PageViewModel
         CleanCommand = new AsyncRelayCommand(CleanAsync, () => !IsBusy && !State.IsScanning && SelectedBytes > 0);
         SelectAllCommand = new RelayCommand(() => SetAll(true));
         SelectNoneCommand = new RelayCommand(() => SetAll(false));
-        UninstallCommand = new AsyncRelayCommand(p => UninstallAsync(p as ProgramItem), _ => !IsBusy);
+        UninstallCommand = new AsyncRelayCommand(p => UninstallAsync(p as ProgramItem), _ => !IsBusy && Session is null);
+        UninstallSelectedCommand = new AsyncRelayCommand(UninstallSelectedAsync, () => !IsBusy && Session is null && SelectedProgramCount > 0);
+        SelectSuggestedCommand = new RelayCommand(() =>
+        {
+            // Chỉ chọn những mục đang hiện (theo bộ lọc / ô tìm kiếm) để người dùng thấy được mình đã chọn gì.
+            foreach (var item in _programItems.Where(i => i.IsSuggested && !i.Program.IsEssential && FilterProgram(i))) item.IsSelected = true;
+        });
+        ClearSelectionCommand = new RelayCommand(() =>
+        {
+            foreach (var item in _programItems) item.IsSelected = false;
+        });
         RefreshSoftwareCommand = new AsyncRelayCommand(RefreshSoftwareAsync, () => !IsBusy && !State.IsScanning && HasResult);
         OpenTaskManagerCommand = new RelayCommand(() => FixService.OpenUri("ms-settings:startupapps"));
         DiskCleanupCommand = new AsyncRelayCommand(() => Main.RunToolAsync(SystemTools.DiskCleanup, false));
@@ -187,6 +211,68 @@ public sealed class CleanupViewModel : PageViewModel
     public int SuggestedCount { get => _suggestedCount; private set => Set(ref _suggestedCount, value); }
     public string ProgramsSummary { get => _programsSummary; private set => Set(ref _programsSummary, value); }
     public AsyncRelayCommand UninstallCommand { get; }
+    public AsyncRelayCommand UninstallSelectedCommand { get; }
+    public RelayCommand SelectSuggestedCommand { get; }
+    public RelayCommand ClearSelectionCommand { get; }
+
+    private List<ProgramItem> _programItems = [];
+    private UninstallSessionViewModel? _session;
+    private bool _quietUninstall = true;
+    private bool _createRestorePoint = true;
+
+    public int SelectedProgramCount => _programItems.Count(p => p.IsSelected);
+    public string SelectedProgramSize => Format.Bytes(_programItems.Where(p => p.IsSelected).Sum(p => p.SizeBytes));
+
+    public string SelectionText => SelectedProgramCount == 0
+        ? Loc.T("uninstall.select_hint")
+        : Loc.F("uninstall.selected", SelectedProgramCount, SelectedProgramSize);
+
+    /// <summary>Gỡ im lặng khi có thể (MSI, QuietUninstallString) – không phải bấm Next.</summary>
+    public bool QuietUninstall { get => _quietUninstall; set => Set(ref _quietUninstall, value); }
+
+    /// <summary>Tạo điểm khôi phục hệ thống trước khi gỡ.</summary>
+    public bool CreateRestorePoint { get => _createRestorePoint; set => Set(ref _createRestorePoint, value); }
+
+    /// <summary>Phiên gỡ sạch đang chạy (hiện thay cho danh sách phần mềm).</summary>
+    public UninstallSessionViewModel? Session
+    {
+        get => _session;
+        private set
+        {
+            if (Set(ref _session, value)) System.Windows.Input.CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    private void NotifyProgramSelection()
+    {
+        OnPropertyChanged(nameof(SelectedProgramCount));
+        OnPropertyChanged(nameof(SelectedProgramSize));
+        OnPropertyChanged(nameof(SelectionText));
+        System.Windows.Input.CommandManager.InvalidateRequerySuggested();
+    }
+
+    private async Task UninstallSelectedAsync()
+    {
+        var selected = _programItems.Where(p => p.IsSelected).Select(p => p.Program).ToList();
+        await StartSessionAsync(selected);
+    }
+
+    private async Task StartSessionAsync(List<InstalledProgram> programs)
+    {
+        if (programs.Count == 0 || Session is not null) return;
+        var names = string.Join("\n", programs.Take(8).Select(p => "• " + p.Name)) + (programs.Count > 8 ? "\n• …" : "");
+        var message = Loc.F("uninstall.confirm", programs.Count, names);
+        if (!await Main.ConfirmAsync(Loc.T("uninstall.start"), message, Loc.T("uninstall.start"), danger: true)) return;
+
+        var session = new UninstallSessionViewModel(Main, programs);
+        session.Closed += async (_, _) =>
+        {
+            Session = null;
+            await RefreshSoftwareAsync();
+        };
+        Session = session;
+        await session.RunAsync(QuietUninstall, CreateRestorePoint);
+    }
     public AsyncRelayCommand RefreshSoftwareCommand { get; }
 
     public string SoftwareFilter
@@ -226,7 +312,10 @@ public sealed class CleanupViewModel : PageViewModel
         NotifySelection();
 
         var now = DateTime.Now;
-        var items = result.Data.Programs.Select(p => new ProgramItem(p, now)).ToList();
+        var selectedIds = _programItems.Where(p => p.IsSelected).Select(p => p.Program.Id).ToHashSet();
+        var items = result.Data.Programs.Select(p => new ProgramItem(p, now, NotifyProgramSelection) { IsSelected = selectedIds.Contains(p.Id) }).ToList();
+        _programItems = items;
+        NotifyProgramSelection();
         SuggestedCount = items.Count(i => i.IsSuggested);
         ProgramsSummary = Loc.F("software.summary", items.Count, Format.Bytes(items.Sum(i => i.SizeBytes)), SuggestedCount);
         var view = CollectionViewSource.GetDefaultView(items);
@@ -311,17 +400,11 @@ public sealed class CleanupViewModel : PageViewModel
         }
     }
 
+    /// <summary>Nút "Gỡ sạch" trên từng dòng: phiên gỡ sạch với một phần mềm.</summary>
     private async Task UninstallAsync(ProgramItem? item)
     {
         if (item is null) return;
-        var message = item.Program.Scope == ProgramScope.Store
-            ? Loc.F("software.confirm_store", item.Name)
-            : Loc.F("software.confirm", item.Name);
-        if (!await Main.ConfirmAsync(Loc.T("software.uninstall"), message, Loc.T("software.uninstall"), danger: true)) return;
-
-        var outcome = await FixService.UninstallAsync(item.Program);
-        Main.ShowToast(outcome.Message.ToString(), !outcome.Success);
-        if (item.Program.Scope == ProgramScope.Store && outcome.Success) await RefreshSoftwareAsync();
+        await StartSessionAsync([item.Program]);
     }
 
     private async Task RefreshSoftwareAsync()

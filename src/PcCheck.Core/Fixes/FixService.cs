@@ -163,7 +163,7 @@ public static class FixService
     }
 
     /// <summary>MpCmdRun.exe của Defender: bản mới nhất trong ProgramData\...\Platform, nếu không có thì trong Program Files.</summary>
-    private static string? MpCmdRun()
+    internal static string? MpCmdRun()
     {
         var platform = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Microsoft", "Windows Defender", "Platform");
         if (Directory.Exists(platform))
@@ -178,6 +178,14 @@ public static class FixService
 
         var programFiles = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Windows Defender", "MpCmdRun.exe");
         return File.Exists(programFiles) ? programFiles : null;
+    }
+
+    /// <summary>Tạo điểm khôi phục không hiện cửa sổ nào (dùng trước khi gỡ nhiều phần mềm). Trả về false nếu Windows từ chối.</summary>
+    public static async Task<bool> TryCreateRestorePointAsync(string description, CancellationToken ct = default)
+    {
+        var safe = description.Replace("'", "", StringComparison.Ordinal);
+        return await RunHiddenAsync("powershell.exe",
+            $"-NoProfile -ExecutionPolicy Bypass -Command \"Checkpoint-Computer -Description '{safe}' -RestorePointType 'APPLICATION_UNINSTALL'\"", ct).ConfigureAwait(false) == 0;
     }
 
     /// <summary>Tắt một tác vụ hẹn giờ (đường dẫn dạng \Thư mục\Tên).</summary>

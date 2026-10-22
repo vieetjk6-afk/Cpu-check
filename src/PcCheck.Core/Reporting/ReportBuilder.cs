@@ -26,7 +26,7 @@ public static class ReportBuilder
         var grade = HealthScore.Grade(result.Score);
         sb.Append("<header><div><h1>").Append(E(Loc.T("report.title"))).Append("</h1><p class=\"muted\">")
           .Append(E(hw.Os.MachineName)).Append(" · ").Append(E(result.Time.ToString("f", culture)))
-          .Append(" · PC Check ").Append(E(appVersion)).Append("</p></div>")
+          .Append(" · PC Check ").Append(E(appVersion)).Append(" · ").Append(E(AppInfo.Author)).Append("</p></div>")
           .Append("<div class=\"score score-").Append(grade.ToString().ToLowerInvariant()).Append("\"><b>")
           .Append(result.Score).Append("</b><span>").Append(E(Labels.Grade(grade))).Append("</span></div></header>");
 

@@ -1,6 +1,3 @@
-using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.ComTypes;
-using System.Text;
 using System.Xml.Linq;
 using Microsoft.Win32;
 using PcCheck.Core.Analysis;
@@ -28,7 +25,7 @@ public static partial class SecurityCollector
             // (tệp .lnk không bao giờ có chữ ký số, nằm trong thư mục người dùng – sẽ bị báo sai).
             if (folder && command.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
             {
-                if (ResolveShortcut(command) is { Target.Length: > 0 } link)
+                if (Util.ShellLink.Resolve(command) is { Target.Length: > 0 } link)
                     command = $"\"{link.Target}\"" + (link.Arguments.Length > 0 ? " " + link.Arguments : "");
                 else
                     unresolved = true;
@@ -85,50 +82,6 @@ public static partial class SecurityCollector
         Parallel.ForEach(list.Where(e => e.Target is { Path.Length: > 0 }), new ParallelOptions { MaxDegreeOfParallelism = 4 },
             e => e.Target = TrustChecker.Check(e.Target!.Path));
         return list;
-    }
-
-    [ComImport]
-    [Guid("000214F9-0000-0000-C000-000000000046")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IShellLinkW
-    {
-        void GetPath([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder file, int size, IntPtr findData, uint flags);
-        void GetIDList(out IntPtr idList);
-        void SetIDList(IntPtr idList);
-        void GetDescription([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder name, int size);
-        void SetDescription([MarshalAs(UnmanagedType.LPWStr)] string name);
-        void GetWorkingDirectory([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder dir, int size);
-        void SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string dir);
-        void GetArguments([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder args, int size);
-    }
-
-    /// <summary>Đích và tham số của lối tắt .lnk (qua ShellLink của Windows).</summary>
-    private static (string Target, string Arguments)? ResolveShortcut(string path)
-    {
-        if (!OperatingSystem.IsWindows()) return null;
-        object? link = null;
-        try
-        {
-            var type = Type.GetTypeFromCLSID(new Guid("00021401-0000-0000-C000-000000000046"));
-            if (type is null) return null;
-            link = Activator.CreateInstance(type);
-            if (link is not IShellLinkW shell || link is not IPersistFile file) return null;
-            file.Load(path, 0);
-            var target = new StringBuilder(1024);
-            shell.GetPath(target, target.Capacity, IntPtr.Zero, 0);
-            var args = new StringBuilder(4096);
-            shell.GetArguments(args, args.Capacity);
-            return (Environment.ExpandEnvironmentVariables(target.ToString()), args.ToString());
-        }
-        catch (Exception ex) when (ex is COMException or InvalidCastException or IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            Log.Warn($"Đọc lối tắt {path} lỗi", ex);
-            return null;
-        }
-        finally
-        {
-            if (link is not null && Marshal.IsComObject(link)) Marshal.FinalReleaseComObject(link);
-        }
     }
 
     /// <summary>Tệp thực thi của lệnh; tên trần (vd "rundll32.exe") được tìm trong System32.</summary>

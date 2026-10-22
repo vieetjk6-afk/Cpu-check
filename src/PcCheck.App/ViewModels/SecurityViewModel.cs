@@ -136,8 +136,11 @@ public sealed class SecurityViewModel : PageViewModel
 
     public SecurityViewModel(MainViewModel main) : base(main)
     {
-        QuickScanCommand = new AsyncRelayCommand(() => Main.RunToolAsync(SystemTools.DefenderQuick, false));
-        FullScanCommand = new AsyncRelayCommand(() => Main.RunToolAsync(SystemTools.DefenderFull, false));
+        QuickScanCommand = new AsyncRelayCommand(() => ScanAsync(DefenderScanType.Quick), () => !IsDefenderScanning);
+        FullScanCommand = new AsyncRelayCommand(() => ScanAsync(DefenderScanType.Full), () => !IsDefenderScanning);
+        StopScanCommand = new RelayCommand(() => _scanCts?.Cancel(), () => IsDefenderScanning);
+        _scanTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _scanTimer.Tick += (_, _) => UpdateScanElapsed();
         OfflineScanCommand = new AsyncRelayCommand(() => Main.RunToolAsync(SystemTools.DefenderOffline, true));
         OpenDefenderCommand = new RelayCommand(() => FixService.OpenUri("windowsdefender:"));
         RescanCommand = new AsyncRelayCommand(RescanAsync, () => !IsRescanning);
@@ -174,6 +177,92 @@ public sealed class SecurityViewModel : PageViewModel
     public int WarningCount { get => _warningCount; private set => Set(ref _warningCount, value); }
     public int InfoCount { get => _infoCount; private set => Set(ref _infoCount, value); }
     public bool HasReport => State.Result?.Security.Collected == true;
+
+    // ---------- Quét virus trong ứng dụng ----------
+    private readonly System.Windows.Threading.DispatcherTimer _scanTimer;
+    private CancellationTokenSource? _scanCts;
+    private DateTime _scanStarted;
+    private DefenderScanType _scanType;
+    private bool _isDefenderScanning;
+    private string _scanStatus = "";
+    private string _lastScanResult = "";
+    private Severity _lastScanSeverity;
+
+    public bool IsDefenderScanning
+    {
+        get => _isDefenderScanning;
+        private set
+        {
+            if (Set(ref _isDefenderScanning, value)) System.Windows.Input.CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    public string ScanStatus { get => _scanStatus; private set => Set(ref _scanStatus, value); }
+    public string LastScanResult { get => _lastScanResult; private set => Set(ref _lastScanResult, value); }
+    public Severity LastScanSeverity { get => _lastScanSeverity; private set => Set(ref _lastScanSeverity, value); }
+    public RelayCommand StopScanCommand { get; }
+
+    private void UpdateScanElapsed()
+    {
+        var elapsed = DateTime.Now - _scanStarted;
+        var text = elapsed.TotalHours >= 1 ? elapsed.ToString(@"h\:mm\:ss") : elapsed.ToString(@"mm\:ss");
+        ScanStatus = Loc.F(_scanType == DefenderScanType.Quick ? "sec.scan.running_quick" : "sec.scan.running_full", text);
+        Main.ActivityText = ScanStatus;
+    }
+
+    /// <summary>Quét bằng Microsoft Defender ngay trong ứng dụng: hiện thời gian đã chạy, cho phép dừng, báo kết quả.</summary>
+    private async Task ScanAsync(DefenderScanType type)
+    {
+        if (IsDefenderScanning) return;
+        _scanType = type;
+        _scanStarted = DateTime.Now;
+        _scanCts = new CancellationTokenSource();
+        IsDefenderScanning = true;
+        UpdateScanElapsed();
+        _scanTimer.Start();
+        try
+        {
+            var result = await DefenderScanner.RunAsync(type, _scanCts.Token);
+            var minutes = Math.Max(1, (int)Math.Round(result.Duration.TotalMinutes));
+            if (!result.Started)
+            {
+                LastScanSeverity = Severity.Warning;
+                LastScanResult = Loc.T("fix.result.no_defender");
+            }
+            else if (result.Cancelled)
+            {
+                LastScanSeverity = Severity.Info;
+                LastScanResult = Loc.F("sec.scan.cancelled", minutes);
+            }
+            else if (result.Threats.Count > 0)
+            {
+                LastScanSeverity = Severity.Critical;
+                LastScanResult = Loc.F("sec.scan.threats", result.Threats.Count, string.Join(", ", result.Threats.Take(3)));
+                await RescanAsync();
+            }
+            else
+            {
+                LastScanSeverity = Severity.Ok;
+                LastScanResult = Loc.F("sec.scan.clean", DateTime.Now.ToString("t", Loc.Instance.Culture), minutes);
+            }
+
+            Main.ShowToast(LastScanResult, LastScanSeverity >= Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Quét Defender lỗi", ex);
+            Main.ShowToast(Loc.F("error.unexpected", ex.Message), true);
+        }
+        finally
+        {
+            _scanTimer.Stop();
+            IsDefenderScanning = false;
+            ScanStatus = "";
+            Main.ActivityText = "";
+            _scanCts.Dispose();
+            _scanCts = null;
+        }
+    }
 
     public AsyncRelayCommand QuickScanCommand { get; }
     public AsyncRelayCommand FullScanCommand { get; }

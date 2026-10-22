@@ -5,6 +5,7 @@ using System.Reflection;
 using PcCheck.App.Infrastructure;
 using PcCheck.Core.Fixes;
 using PcCheck.Core.Localization;
+using PcCheck.Core.Models;
 using PcCheck.Core.Updates;
 using PcCheck.Core.Util;
 
@@ -23,7 +24,7 @@ public enum UpdateState
 }
 
 /// <summary>Kiểm tra / tải / cài bản mới từ GitHub Releases (thẻ "Cập nhật" trong Cài đặt + thông báo ở thanh bên).</summary>
-public sealed class UpdateViewModel : ObservableObject
+public sealed class UpdateViewModel : PageViewModel
 {
     private static readonly TimeSpan AutoCheckInterval = TimeSpan.FromHours(12);
 
@@ -34,6 +35,7 @@ public sealed class UpdateViewModel : ObservableObject
     private double _progress;
 
     public UpdateViewModel(MainViewModel main)
+        : base(main)
     {
         _main = main;
         CurrentVersion = Version.TryParse(main.AppVersion, out var v) ? v : new Version(1, 0, 0);
@@ -42,10 +44,18 @@ public sealed class UpdateViewModel : ObservableObject
 
         CheckCommand = new AsyncRelayCommand(() => CheckAsync(silent: false), () => !IsBusy);
         InstallCommand = new AsyncRelayCommand(InstallAsync, () => CanInstall && !IsBusy);
-        SkipCommand = new RelayCommand(Skip, () => _release is not null && State == UpdateState.Available);
+        SkipCommand = new RelayCommand(Skip, () => _release is not null && Phase == UpdateState.Available);
         OpenPageCommand = new RelayCommand(() => FixService.OpenUri(_release?.PageUrl ?? UpdateService.ReleasesPage));
-        Loc.Instance.LanguageChanged += (_, _) => Refresh();
+        OpenAuthorCommand = new RelayCommand(() => FixService.OpenUri(AppInfo.AuthorUrl));
+        OpenProjectCommand = new RelayCommand(() => FixService.OpenUri(AppInfo.ProjectUrl));
     }
+
+    public string VersionText => "v" + CurrentVersion.ToString(3);
+    public string Author => AppInfo.Author;
+    public string ProjectUrl => AppInfo.ProjectUrl;
+
+    /// <summary>"Bản portable (kèm .NET)" / "Bản nhỏ (cần .NET Desktop Runtime)".</summary>
+    public string FlavorText => Loc.T("update.flavor." + Flavor);
 
     public Version CurrentVersion { get; }
 
@@ -55,7 +65,7 @@ public sealed class UpdateViewModel : ObservableObject
     /// <summary>Đang chạy bản 1 tệp .exe (bản phát hành) – thay thế được. Bản build thử nhiều tệp thì chỉ mở trang tải.</summary>
     public bool CanSelfUpdate { get; }
 
-    public UpdateState State
+    public UpdateState Phase
     {
         get => _state;
         private set
@@ -64,9 +74,9 @@ public sealed class UpdateViewModel : ObservableObject
         }
     }
 
-    public bool IsBusy => State is UpdateState.Checking or UpdateState.Downloading or UpdateState.Installing;
-    public bool IsAvailable => State == UpdateState.Available;
-    public bool IsDownloading => State is UpdateState.Downloading or UpdateState.Installing;
+    public bool IsBusy => Phase is UpdateState.Checking or UpdateState.Downloading or UpdateState.Installing;
+    public bool IsAvailable => Phase == UpdateState.Available;
+    public bool IsDownloading => Phase is UpdateState.Downloading or UpdateState.Installing;
     public bool CanInstall => IsAvailable && CanSelfUpdate && Asset is not null;
     public bool ShowManualHint => IsAvailable && !CanInstall;
 
@@ -81,7 +91,7 @@ public sealed class UpdateViewModel : ObservableObject
     public bool HasNotes => IsAvailable && ReleaseNotes.Length > 0;
     public string BannerText => Loc.F("update.banner", LatestVersion);
 
-    public string StatusText => State switch
+    public string StatusText => Phase switch
     {
         UpdateState.Checking => Loc.T("update.checking"),
         UpdateState.UpToDate => Loc.F("update.up_to_date", CurrentVersion.ToString(3)),
@@ -112,6 +122,10 @@ public sealed class UpdateViewModel : ObservableObject
     public AsyncRelayCommand InstallCommand { get; }
     public RelayCommand SkipCommand { get; }
     public RelayCommand OpenPageCommand { get; }
+    public RelayCommand OpenAuthorCommand { get; }
+    public RelayCommand OpenProjectCommand { get; }
+
+    protected override void Rebuild() => Refresh();
 
     private AppSettings Settings => _main.State.Settings;
     private ReleaseAsset? Asset => _release is null ? null : UpdateService.PickAsset(_release, Flavor);
@@ -140,7 +154,7 @@ public sealed class UpdateViewModel : ObservableObject
     public async Task CheckAsync(bool silent)
     {
         if (IsBusy) return;
-        State = UpdateState.Checking;
+        Phase = UpdateState.Checking;
         var result = await UpdateService.CheckAsync(CurrentVersion);
         _release = result.Release;
         _error = result.Error;
@@ -153,14 +167,14 @@ public sealed class UpdateViewModel : ObservableObject
             Settings.Save();
         }
 
-        State = result.Status switch
+        Phase = result.Status switch
         {
             UpdateStatus.Available => UpdateState.Available,
             UpdateStatus.UpToDate => UpdateState.UpToDate,
             UpdateStatus.NoRelease => UpdateState.NoRelease,
             _ => UpdateState.Failed,
         };
-        if (!silent && State == UpdateState.Failed) _main.ShowToast(StatusText, isError: true);
+        if (!silent && Phase == UpdateState.Failed) _main.ShowToast(StatusText, isError: true);
     }
 
     private async Task InstallAsync()
@@ -169,7 +183,7 @@ public sealed class UpdateViewModel : ObservableObject
         var size = asset.Size > 0 ? Format.Bytes(asset.Size, Loc.Instance.Culture) : "—";
         if (!await _main.ConfirmAsync(Loc.T("update.confirm_title"), Loc.F("update.confirm", LatestVersion, size), Loc.T("update.install"))) return;
 
-        State = UpdateState.Downloading;
+        Phase = UpdateState.Downloading;
         Progress = 0;
         try
         {
@@ -180,7 +194,7 @@ public sealed class UpdateViewModel : ObservableObject
             });
             var prepared = await UpdateService.DownloadAsync(asset, progress);
 
-            State = UpdateState.Installing;
+            Phase = UpdateState.Installing;
             var exe = Environment.ProcessPath!;
 
             // Chép + kiểm tra tệp lớn ở luồng nền để cửa sổ không bị đơ.
@@ -229,7 +243,7 @@ public sealed class UpdateViewModel : ObservableObject
 
     private void Fail(string message)
     {
-        State = UpdateState.Available;
+        Phase = UpdateState.Available;
         _main.ShowToast(message, isError: true);
     }
 
@@ -248,10 +262,17 @@ public sealed class UpdateViewModel : ObservableObject
                  {
                      nameof(IsBusy), nameof(IsAvailable), nameof(IsDownloading), nameof(CanInstall), nameof(ShowManualHint), nameof(ShowBanner),
                      nameof(CurrentText), nameof(LatestVersion), nameof(ReleaseNotes), nameof(HasNotes), nameof(BannerText), nameof(StatusText),
-                     nameof(ManualHint),
+                     nameof(ManualHint), nameof(FlavorText),
                  })
         {
             OnPropertyChanged(name);
+        }
+
+        // Huy hiệu trên mục "Cập nhật" ở thanh bên khi có bản mới.
+        if (_main.NavItems?.FirstOrDefault(n => n.Key == Pages.Update) is { } nav)
+        {
+            nav.Badge = ShowBanner ? 1 : 0;
+            nav.BadgeSeverity = Severity.Ok;
         }
 
         System.Windows.Input.CommandManager.InvalidateRequerySuggested();
