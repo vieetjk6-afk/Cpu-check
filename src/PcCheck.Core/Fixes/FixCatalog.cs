@@ -12,6 +12,7 @@ public static class Pages
     public const string Compatibility = "compatibility";
     public const string Drivers = "drivers";
     public const string Cleanup = "cleanup";
+    public const string Storage = "storage";
     public const string Software = "software";
     public const string Startup = "startup";
     public const string Issues = "issues";
@@ -32,6 +33,8 @@ public static class FixCatalog
         new(FixKind.RunTool, tool, L(labelKey), confirm) { ConfirmMessage = confirm ? L("tool." + tool + ".confirm") : null };
 
     public static FixAction CleanupPage => Navigate(Pages.Cleanup, "fix.go_cleanup");
+
+    public static FixAction StoragePage => Navigate(Pages.Storage, "fix.go_storage");
     public static FixAction SoftwarePage => Navigate(Pages.Software, "fix.go_software");
     public static FixAction StartupPage => Navigate(Pages.Startup, "fix.go_startup");
     public static FixAction DriversPage => Navigate(Pages.Drivers, "fix.go_drivers");

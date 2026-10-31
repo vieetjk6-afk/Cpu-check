@@ -103,8 +103,80 @@ public static class RecycleBin
         return start >= 0 && end > start ? name[start..(end + 1)] : null;
     }
 
+    /// <summary>
+    /// Chuyển tệp/thư mục vào Thùng rác trên một luồng STA riêng (không làm đơ cửa sổ). Chỉ khi chắc chắn Thùng rác giữ được:
+    /// nếu không, SHFileOperation sẽ âm thầm xóa vĩnh viễn – khi đó từ chối (trả về false) và giữ nguyên.
+    /// </summary>
+    /// <param name="bytes">Dung lượng đã biết (0 = tự đo nếu là tệp).</param>
+    public static Task<bool> MoveAsync(string path, long bytes = 0)
+    {
+        if (!File.Exists(path) && !Directory.Exists(path)) return Task.FromResult(true);
+        if (bytes <= 0 && File.Exists(path)) bytes = new FileInfo(path).Length;
+        if (!CanHold(path, bytes, out var why))
+        {
+            Log.Warn($"Không chuyển vào Thùng rác được ({why}), giữ nguyên: {path}");
+            return Task.FromResult(false);
+        }
+
+        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                tcs.SetResult(Recycle(path));
+            }
+            catch (Exception ex)
+            {
+                tcs.SetException(ex);
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "PcCheck recycle",
+        };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        return tcs.Task;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct ShFileOpStruct
+    {
+        public IntPtr hwnd;
+        public uint wFunc;
+        [MarshalAs(UnmanagedType.LPWStr)] public string pFrom;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? pTo;
+        public ushort fFlags;
+        public int fAnyOperationsAborted;
+        public IntPtr hNameMappings;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? lpszProgressTitle;
+    }
+
+    private const uint FoDelete = 3;
+    private const ushort FofSilent = 0x0004;
+    private const ushort FofNoConfirmation = 0x0010;
+    private const ushort FofAllowUndo = 0x0040;
+    private const ushort FofNoErrorUi = 0x0400;
+
+    private static bool Recycle(string path)
+    {
+        if (!File.Exists(path) && !Directory.Exists(path)) return true;
+        var op = new ShFileOpStruct
+        {
+            wFunc = FoDelete,
+            pFrom = path + "\0\0",
+            fFlags = FofAllowUndo | FofNoConfirmation | FofSilent | FofNoErrorUi,
+        };
+        var result = SHFileOperation(ref op);
+        if (result != 0 || op.fAnyOperationsAborted != 0) Log.Warn($"Chuyển vào Thùng rác lỗi 0x{result:X} ({path})");
+        return result == 0 && op.fAnyOperationsAborted == 0 && !File.Exists(path) && !Directory.Exists(path);
+    }
+
 #pragma warning disable SYSLIB1054
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "GetVolumeNameForVolumeMountPointW")]
     private static extern bool GetVolumeNameForVolumeMountPoint(string volumeMountPoint, StringBuilder volumeName, uint bufferLength);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHFileOperation(ref ShFileOpStruct op);
 #pragma warning restore SYSLIB1054
 }

@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using PcCheck.Core.Util;
 
@@ -23,6 +22,7 @@ public static class LeftoverRemover
         Directory.CreateDirectory(backup);
         int removed = 0, failed = 0, index = 0;
         long freed = 0;
+        var history = new List<Models.OperationRecord>();
 
         // Xóa dịch vụ/tác vụ/registry trước, tệp sau (tệp có thể đang bị dịch vụ giữ).
         foreach (var item in items.OrderBy(i => Order(i.Kind)))
@@ -58,7 +58,20 @@ public static class LeftoverRemover
             {
                 failed++;
             }
+
+            var isFile = item.Kind is LeftoverKind.Folder or LeftoverKind.File or LeftoverKind.Shortcut;
+            history.Add(new Models.OperationRecord
+            {
+                Time = DateTime.Now,
+                Source = Storage.OperationLog.SourceLeftovers,
+                Action = !ok ? Storage.OperationLog.ActionFailed : isFile ? Storage.OperationLog.ActionRecycled : Storage.OperationLog.ActionRemoved,
+                Target = item.Kind == LeftoverKind.RegistryValue ? $"{item.Path}\\{item.ValueName}" : item.Path,
+                Bytes = ok ? item.Bytes : 0,
+                Detail = item.Program,
+            });
         }
+
+        Storage.OperationLog.Record(history);
 
         // Không có gì cần sao lưu -> bỏ thư mục trống.
         try
@@ -86,78 +99,7 @@ public static class LeftoverRemover
 
     // ===== Thùng rác (SHFileOperation, FOF_ALLOWUNDO) =====
 
-    /// <summary>
-    /// Chuyển vào Thùng rác trên một luồng STA riêng (không làm đơ cửa sổ). Chỉ khi chắc chắn Thùng rác giữ được tệp:
-    /// nếu không, SHFileOperation sẽ âm thầm xóa vĩnh viễn – khi đó từ chối và báo "không xóa được".
-    /// </summary>
-    private static Task<bool> RecycleAsync(Leftover item)
-    {
-        if (!File.Exists(item.Path) && !Directory.Exists(item.Path)) return Task.FromResult(true);
-        var bytes = item.Bytes > 0 ? item.Bytes : File.Exists(item.Path) ? new FileInfo(item.Path).Length : 0;
-        if (!RecycleBin.CanHold(item.Path, bytes, out var why))
-        {
-            Log.Warn($"Không chuyển vào Thùng rác được ({why}), giữ nguyên: {item.Path}");
-            return Task.FromResult(false);
-        }
-
-        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                tcs.SetResult(Recycle(item.Path));
-            }
-            catch (Exception ex)
-            {
-                tcs.SetException(ex);
-            }
-        })
-        {
-            IsBackground = true,
-            Name = "PcCheck recycle",
-        };
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return tcs.Task;
-    }
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private struct ShFileOpStruct
-    {
-        public IntPtr hwnd;
-        public uint wFunc;
-        [MarshalAs(UnmanagedType.LPWStr)] public string pFrom;
-        [MarshalAs(UnmanagedType.LPWStr)] public string? pTo;
-        public ushort fFlags;
-        public int fAnyOperationsAborted;
-        public IntPtr hNameMappings;
-        [MarshalAs(UnmanagedType.LPWStr)] public string? lpszProgressTitle;
-    }
-
-    private const uint FoDelete = 3;
-    private const ushort FofSilent = 0x0004;
-    private const ushort FofNoConfirmation = 0x0010;
-    private const ushort FofAllowUndo = 0x0040;
-    private const ushort FofNoErrorUi = 0x0400;
-
-#pragma warning disable SYSLIB1054
-    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
-    private static extern int SHFileOperation(ref ShFileOpStruct op);
-#pragma warning restore SYSLIB1054
-
-    private static bool Recycle(string path)
-    {
-        if (!File.Exists(path) && !Directory.Exists(path)) return true;
-        var op = new ShFileOpStruct
-        {
-            wFunc = FoDelete,
-            pFrom = path + "\0\0",
-            fFlags = FofAllowUndo | FofNoConfirmation | FofSilent | FofNoErrorUi,
-        };
-        var result = SHFileOperation(ref op);
-        if (result != 0 || op.fAnyOperationsAborted != 0) Log.Warn($"Chuyển vào Thùng rác lỗi 0x{result:X} ({path})");
-        return result == 0 && op.fAnyOperationsAborted == 0 && !File.Exists(path) && !Directory.Exists(path);
-    }
+    private static Task<bool> RecycleAsync(Leftover item) => RecycleBin.MoveAsync(item.Path, item.Bytes);
 
     // ===== Registry =====
 

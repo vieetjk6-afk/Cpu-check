@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO.Enumeration;
 using PcCheck.Core.Localization;
 using PcCheck.Core.Models;
+using PcCheck.Core.Storage;
 using PcCheck.Core.Util;
 using static PcCheck.Core.Localization.LocFactory;
 
@@ -20,6 +21,22 @@ public static class JunkScanner
     private static string Roaming => Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
     private static string Windows => Environment.GetFolderPath(Environment.SpecialFolder.Windows);
     private static string ProgramData => Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+    private static string Profile => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+    /// <summary>Ứng dụng Electron / desktop có bộ đệm riêng (chỉ hiện khi có dữ liệu). Không đụng tới tin nhắn, cài đặt hay đăng nhập.</summary>
+    private static readonly (string Name, Func<IEnumerable<string>> Caches)[] AppCaches =
+    [
+        ("Discord", () => ElectronCaches(Path.Combine(Roaming, "discord"))),
+        ("Slack", () => ElectronCaches(Path.Combine(Roaming, "Slack"))),
+        ("Microsoft Teams", () => ElectronCaches(Path.Combine(Roaming, @"Microsoft\Teams"))),
+        ("Visual Studio Code", () => [.. ElectronCaches(Path.Combine(Roaming, "Code")), Path.Combine(Roaming, @"Code\CachedData"), Path.Combine(Roaming, @"Code\CachedExtensionVSIXs")]),
+        ("Spotify", () => [Path.Combine(Local, @"Spotify\Browser\Cache"), Path.Combine(Local, @"Spotify\Browser\GPUCache")]),
+        ("Steam", () => [Path.Combine(Local, @"Steam\htmlcache\Cache"), Path.Combine(Local, @"Steam\htmlcache\Code Cache"), Path.Combine(Local, @"Steam\htmlcache\GPUCache")]),
+        ("Epic Games Launcher", () => [Path.Combine(Local, @"EpicGamesLauncher\Saved\webcache"), Path.Combine(Local, @"EpicGamesLauncher\Saved\webcache_4147"), Path.Combine(Local, @"EpicGamesLauncher\Saved\webcache_4430")]),
+    ];
+
+    private static IEnumerable<string> ElectronCaches(string root) =>
+        new[] { "Cache", "Code Cache", "GPUCache", "DawnCache", "DawnGraphiteCache", "DawnWebGPUCache", @"Service Worker\ScriptCache" }.Select(c => Path.Combine(root, c));
 
     private static readonly (string Name, Func<string> UserData)[] ChromiumBrowsers =
     [
@@ -85,6 +102,29 @@ public static class JunkScanner
                     new(Path.Combine(Local, @"Intel\ShaderCache")),
                 ]),
         };
+
+        targets.Add(new Target("inet-cache", L("junk.inet_cache.name"), L("junk.inet_cache.desc"), true, TimeSpan.FromDays(1),
+            () => [new(Path.Combine(Local, @"Microsoft\Windows\INetCache"))]));
+
+        targets.Add(new Target("dev-caches", L("junk.dev_caches.name"), L("junk.dev_caches.desc"), false, TimeSpan.Zero,
+            () =>
+            [
+                new(Path.Combine(Local, @"npm-cache\_cacache")),
+                new(Path.Combine(Local, @"Yarn\Cache")),
+                new(Path.Combine(Local, @"pip\cache")),
+                new(Path.Combine(Local, @"NuGet\v3-cache")),
+                new(Path.Combine(Local, @"NuGet\plugins-cache")),
+                new(Path.Combine(Local, "go-build")),
+                new(Path.Combine(Local, @"Composer\cache")),
+                new(Path.Combine(Local, @"ms-playwright-go")),
+                new(Path.Combine(Profile, @".cache\pre-commit")),
+            ]));
+
+        foreach (var (name, caches) in AppCaches)
+        {
+            targets.Add(new Target("app:" + name, L("junk.app.name", name), L("junk.app.desc"), true, TimeSpan.Zero,
+                () => caches().Where(Directory.Exists).Select(c => new Location(c))));
+        }
 
         foreach (var (name, userData) in ChromiumBrowsers)
         {
@@ -184,7 +224,7 @@ public static class JunkScanner
             {
                 foreach (var location in target.Locations())
                 {
-                    if (!Directory.Exists(location.Root)) continue;
+                    if (!Directory.Exists(location.Root) || ProtectedPaths.IsProtected(location.Root)) continue;
                     category.Roots.Add(location.Root);
                     foreach (var (size, _) in EnumerateFiles(location, cutoff))
                     {
@@ -207,13 +247,14 @@ public static class JunkScanner
             return ValueTask.CompletedTask;
         }).ConfigureAwait(false);
 
-        var result = categories.Where(c => c.Files > 0 || !c.Key.StartsWith("browser:", StringComparison.Ordinal)).ToList();
+        var result = categories.Where(c => c.Files > 0 || !(c.Key.StartsWith("browser:", StringComparison.Ordinal) || c.Key.StartsWith("app:", StringComparison.Ordinal) || c.Key == "dev-caches")).ToList();
         result.Add(ScanRecycleBin());
         return result;
     }
 
     private static IEnumerable<(long Size, string Path)> EnumerateFiles(Location location, DateTime cutoffUtc)
     {
+        var guarded = ProtectedPaths.Patterns.Count > 0;
         var enumerable = new FileSystemEnumerable<(long, string)>(
             location.Root,
             (ref FileSystemEntry entry) => (entry.Length, entry.ToFullPath()),
@@ -224,7 +265,7 @@ public static class JunkScanner
                 && entry.LastWriteTimeUtc.UtcDateTime <= cutoffUtc
                 && (location.Pattern == "*" || FileSystemName.MatchesSimpleExpression(location.Pattern, entry.FileName)),
         };
-        return enumerable;
+        return guarded ? enumerable.Where(e => !ProtectedPaths.IsProtected(e.Item2)) : enumerable;
     }
 
     private static JunkCategory ScanRecycleBin()
@@ -259,6 +300,7 @@ public static class JunkScanner
         var selected = keys.ToHashSet(StringComparer.Ordinal);
         long freed = 0;
         int deleted = 0, skipped = 0;
+        var history = new List<OperationRecord>();
 
         await Task.Run(() =>
         {
@@ -267,24 +309,38 @@ public static class JunkScanner
                 ct.ThrowIfCancellationRequested();
                 progress?.Report(target.Name.ToString());
                 var cutoff = DateTime.UtcNow - target.MinAge;
+                long categoryFreed = 0;
+                int categoryDeleted = 0, categorySkipped = 0;
                 foreach (var location in target.Locations())
                 {
-                    if (!Directory.Exists(location.Root)) continue;
+                    if (!Directory.Exists(location.Root) || ProtectedPaths.IsProtected(location.Root)) continue;
                     foreach (var (size, path) in EnumerateFiles(location, cutoff).ToList())
                     {
                         ct.ThrowIfCancellationRequested();
                         if (TryDelete(path))
                         {
-                            freed += size;
-                            deleted++;
+                            categoryFreed += size;
+                            categoryDeleted++;
                         }
                         else
                         {
-                            skipped++;
+                            categorySkipped++;
                         }
                     }
 
                     if (location.DeleteEmptyDirs && location.Recursive) DeleteEmptyDirectories(location.Root);
+                }
+
+                freed += categoryFreed;
+                deleted += categoryDeleted;
+                skipped += categorySkipped;
+                if (categoryDeleted > 0 || categorySkipped > 0)
+                {
+                    history.Add(new OperationRecord
+                    {
+                        Time = DateTime.Now, Source = OperationLog.SourceJunk, Action = OperationLog.ActionRemoved, Target = target.Name.ToString(),
+                        Bytes = categoryFreed, Count = categoryDeleted, Detail = categorySkipped > 0 ? $"skipped {categorySkipped}" : null,
+                    });
                 }
             }
 
@@ -300,6 +356,11 @@ public static class JunkScanner
                     {
                         freed += before.Bytes;
                         deleted += before.Files;
+                        history.Add(new OperationRecord
+                        {
+                            Time = DateTime.Now, Source = OperationLog.SourceJunk, Action = OperationLog.ActionRemoved, Target = Loc.T("junk.recycle.name"),
+                            Bytes = before.Bytes, Count = before.Files,
+                        });
                     }
                 }
                 catch (Exception ex)
@@ -309,6 +370,7 @@ public static class JunkScanner
             }
         }, ct).ConfigureAwait(false);
 
+        OperationLog.Record(history);
         Log.Info($"Dọn rác: giải phóng {freed} byte, xóa {deleted} tệp, bỏ qua {skipped}");
         return new CleanResult(freed, deleted, skipped);
     }
