@@ -247,7 +247,9 @@ public static class HardwareAnalyzer
             Title = L("issue.low_space.title", volume.Letter, new ByteSize(volume.FreeBytes)),
             Detail = L("issue.low_space.detail", volume.Letter, new ByteSize(volume.FreeBytes), new ByteSize(volume.TotalBytes), Math.Round(volume.FreePercent)),
             Recommendation = volume.IsSystem ? L("issue.low_space.rec_system") : L("issue.low_space.rec_data"),
-            Fixes = volume.IsSystem ? [FixCatalog.CleanupPage, FixCatalog.StorageSense, FixCatalog.SoftwarePage] : [FixCatalog.StorageSense],
+            Fixes = volume.IsSystem
+                ? [FixCatalog.CleanupPage, FixCatalog.StoragePage, FixCatalog.StorageSense, FixCatalog.SoftwarePage]
+                : [FixCatalog.StoragePage, FixCatalog.StorageSense],
         };
     }
 }

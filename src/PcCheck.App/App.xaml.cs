@@ -80,6 +80,7 @@ public partial class App : Application
 
         var widgetOnly = e.Args.Any(a => a.Equals(AutoStart.WidgetArgument, StringComparison.OrdinalIgnoreCase));
         var settings = AppSettings.Load();
+        PcCheck.Core.Storage.ProtectedPaths.Set(settings.ProtectedPaths);
         Loc.Instance.SetLanguage(string.IsNullOrEmpty(settings.Language) ? Loc.DefaultLanguageForSystem() : settings.Language);
         ThemeManager.Apply(settings.Theme);
         Log.Info($"Khởi động PC Check, admin={Elevation.IsAdministrator()}, ngôn ngữ={Loc.Instance.Language}, widget={widgetOnly}");

@@ -65,6 +65,7 @@ public sealed class MainViewModel : ObservableObject
         Compatibility = new CompatibilityViewModel(this);
         Drivers = new DriversViewModel(this);
         Cleanup = new CleanupViewModel(this);
+        Storage = new StorageViewModel(this);
         Issues = new IssuesViewModel(this);
         Security = new SecurityViewModel(this);
         Settings = new SettingsViewModel(this);
@@ -79,6 +80,7 @@ public sealed class MainViewModel : ObservableObject
             new(Pages.Compatibility, "nav.compatibility", "", Compatibility),
             new(Pages.Drivers, "nav.drivers", "", Drivers),
             new(Pages.Cleanup, "nav.cleanup", "", Cleanup),
+            new(Pages.Storage, "nav.storage", "\uEDA2", Storage),
             new(Pages.Issues, "nav.issues", "", Issues),
             new(Pages.Security, "nav.security", "\uEA18", Security),
             new(Pages.Widget, "nav.widget", "\uE718", Widget),
@@ -124,6 +126,7 @@ public sealed class MainViewModel : ObservableObject
     public CompatibilityViewModel Compatibility { get; }
     public DriversViewModel Drivers { get; }
     public CleanupViewModel Cleanup { get; }
+    public StorageViewModel Storage { get; }
     public IssuesViewModel Issues { get; }
     public SecurityViewModel Security { get; }
     public SettingsViewModel Settings { get; }
