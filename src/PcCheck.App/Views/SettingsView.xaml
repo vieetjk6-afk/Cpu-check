@@ -67,6 +67,79 @@
                 </StackPanel>
             </Border>
 
+            <!-- Dọn dẹp an toàn: thư mục được bảo vệ và thư mục dự án -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="{l:T settings.cleanup_safety}" Style="{StaticResource H2}" Margin="0,0,0,14" />
+
+                    <Grid Margin="0,0,0,8">
+                        <StackPanel Margin="0,0,160,0">
+                            <TextBlock Text="{l:T settings.protected}" Style="{StaticResource H3}" />
+                            <TextBlock Text="{l:T settings.protected_desc}" Style="{StaticResource Caption}" TextWrapping="Wrap" TextTrimming="None" />
+                        </StackPanel>
+                        <Button HorizontalAlignment="Right" VerticalAlignment="Center" Command="{Binding AddProtectedCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE710;" FontSize="12" />
+                                <TextBlock Text="{l:T settings.add_folder}" Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding ProtectedPathList}" Focusable="False" Margin="0,0,0,18">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource SubCard}" Padding="12,6" Margin="0,4,0,0">
+                                    <Grid>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,40,0">
+                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE72E;" FontSize="13" Foreground="{StaticResource SuccessBrush}" />
+                                            <TextBlock Text="{Binding}" Margin="10,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <Button Style="{StaticResource GhostButton}" HorizontalAlignment="Right" ToolTip="{l:T common.remove}"
+                                                Command="{Binding DataContext.RemoveProtectedCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}">
+                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE711;" FontSize="11"
+                                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Grid Margin="0,0,0,8">
+                        <StackPanel Margin="0,0,160,0">
+                            <TextBlock Text="{l:T settings.projects}" Style="{StaticResource H3}" />
+                            <TextBlock Text="{l:T settings.projects_desc}" Style="{StaticResource Caption}" TextWrapping="Wrap" TextTrimming="None" />
+                        </StackPanel>
+                        <Button HorizontalAlignment="Right" VerticalAlignment="Center" Command="{Binding AddProjectFolderCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE710;" FontSize="12" />
+                                <TextBlock Text="{l:T settings.add_folder}" Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding ProjectFolderList}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource SubCard}" Padding="12,6" Margin="0,4,0,0">
+                                    <Grid>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,40,0">
+                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE8B7;" FontSize="13" Foreground="{DynamicResource AccentBrush}" />
+                                            <TextBlock Text="{Binding}" Margin="10,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <Button Style="{StaticResource GhostButton}" HorizontalAlignment="Right" ToolTip="{l:T common.remove}"
+                                                Command="{Binding DataContext.RemoveProjectFolderCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}">
+                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE711;" FontSize="11"
+                                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
             <!-- Cập nhật phần mềm: chi tiết ở trang Cập nhật -->
             <Border Style="{StaticResource Card}" Margin="0,0,0,14" DataContext="{Binding Main.Updates}">
                 <Grid>

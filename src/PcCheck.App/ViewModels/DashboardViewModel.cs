@@ -7,6 +7,15 @@ using PcCheck.Core.Util;
 
 namespace PcCheck.App.ViewModels;
 
+/// <summary>Một dòng trong bảng tiến trình nặng nhất.</summary>
+public sealed class ProcessRow(ProcessUsage usage, string value, double percent)
+{
+    public string Name { get; } = usage.Count > 1 ? $"{usage.Name} (×{usage.Count})" : usage.Name;
+    public string Value { get; } = value;
+    public double Percent { get; } = percent;
+    public string Tooltip { get; } = usage.Path ?? usage.Name;
+}
+
 public sealed class CategoryTile(string glyph, string title, int count, Severity severity, string status, string page)
 {
     public string Glyph { get; } = glyph;
@@ -124,8 +133,43 @@ public sealed class DashboardViewModel : PageViewModel
         return new CategoryTile(glyph, Loc.T(titleKey), important.Count, severity, status, page);
     }
 
+    private readonly ProcessMonitor _processes = new();
+    private bool _sampling;
+    private IReadOnlyList<ProcessRow> _topCpu = [];
+    private IReadOnlyList<ProcessRow> _topMemory = [];
+
+    /// <summary>Tiến trình dùng nhiều CPU nhất (giống "top processes" của Mole).</summary>
+    public IReadOnlyList<ProcessRow> TopCpu { get => _topCpu; private set => Set(ref _topCpu, value); }
+
+    /// <summary>Tiến trình dùng nhiều RAM nhất.</summary>
+    public IReadOnlyList<ProcessRow> TopMemory { get => _topMemory; private set => Set(ref _topMemory, value); }
+
+    /// <summary>Lấy mẫu tiến trình trên luồng nền – chỉ khi đang xem trang Tổng quan để không tốn tài nguyên.</summary>
+    private async Task SampleProcessesAsync()
+    {
+        if (_sampling || !ReferenceEquals(Main.CurrentPage, this)) return;
+        _sampling = true;
+        try
+        {
+            var (byCpu, byMemory) = await Task.Run(() => _processes.Sample(5));
+            var culture = Loc.Instance.Culture;
+            var total = State.MemoryTotal;
+            TopCpu = byCpu.Select(p => new ProcessRow(p, Format.Percent(p.CpuPercent, culture), p.CpuPercent)).ToList();
+            TopMemory = byMemory.Select(p => new ProcessRow(p, Format.Bytes(p.MemoryBytes, culture), total > 0 ? 100.0 * p.MemoryBytes / total : 0)).ToList();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Đọc danh sách tiến trình lỗi", ex);
+        }
+        finally
+        {
+            _sampling = false;
+        }
+    }
+
     protected override void OnLive()
     {
+        _ = SampleProcessesAsync();
         var live = State.Live;
         var culture = Loc.Instance.Culture;
 

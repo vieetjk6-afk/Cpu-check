@@ -120,6 +120,6 @@ public sealed partial class LocalizationTests
     private static partial Regex CsKey();
 
     // Tên tệp và tên miền (vd google.com, vietcombank.com.vn) không phải khóa dịch.
-    [GeneratedRegex(@"\.(exe|msc|cpl|dll|json|log|ini|xaml|html|com|net|org|vn|me|io)$")]
+    [GeneratedRegex(@"\.(exe|msc|cpl|dll|json|jsonl|log|ini|xaml|html|com|net|org|vn|me|io|php|gradle|kts|zig|vhdx|sys|py|xml|yaml|toml|cfg|hcl)$")]
     private static partial Regex FileLike();
 }

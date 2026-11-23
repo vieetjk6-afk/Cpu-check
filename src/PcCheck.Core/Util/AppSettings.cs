@@ -27,6 +27,12 @@ public sealed class AppSettings
     /// <summary>Phiên bản người dùng chọn "Bỏ qua" – không nhắc lại cho tới khi có bản mới hơn.</summary>
     public string? SkippedVersion { get; set; }
 
+    /// <summary>Thư mục/mẫu được bảo vệ: mọi chức năng dọn dẹp đều bỏ qua (hỗ trợ * và ?).</summary>
+    public List<string> ProtectedPaths { get; set; } = [];
+
+    /// <summary>Thư mục dự án lập trình tự thêm (ngoài các thư mục mặc định) để tìm thư mục build.</summary>
+    public List<string> ProjectFolders { get; set; } = [];
+
     public static string FilePath { get; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PcCheck", "settings.json");
 
@@ -43,6 +49,8 @@ public sealed class AppSettings
     {
         var settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
         settings.Widget ??= new WidgetSettings();
+        settings.ProtectedPaths = settings.ProtectedPaths?.Where(p => !string.IsNullOrWhiteSpace(p)).ToList() ?? [];
+        settings.ProjectFolders = settings.ProjectFolders?.Where(p => !string.IsNullOrWhiteSpace(p)).ToList() ?? [];
         settings.Widget.Metrics = settings.Widget.Metrics?.Where(WidgetSettings.AllMetrics.Contains).Distinct().ToList() ?? [.. WidgetSettings.DefaultMetrics];
         return settings;
     }

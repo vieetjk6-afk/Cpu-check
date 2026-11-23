@@ -4,6 +4,20 @@
              xmlns:l="clr-namespace:PcCheck.App.Infrastructure"
              xmlns:c="clr-namespace:PcCheck.App.Controls"
              xmlns:views="clr-namespace:PcCheck.App.Views">
+    <UserControl.Resources>
+        <DataTemplate x:Key="ProcessRowTemplate">
+            <Grid Margin="0,4,0,0" ToolTip="{Binding Tooltip}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="90" />
+                    <ColumnDefinition Width="80" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="12.5" />
+                <ProgressBar Grid.Column="1" Height="5" Maximum="100" Value="{Binding Percent, Mode=OneWay}" VerticalAlignment="Center" Margin="8,0" />
+                <TextBlock Grid.Column="2" Text="{Binding Value}" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="12.5" FontWeight="SemiBold" />
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="32,28,32,36">
             <!-- Tiêu đề -->
@@ -99,6 +113,35 @@
                 <ContentControl Content="{Binding RamTile}" ContentTemplate="{StaticResource StatTileTemplate}" Focusable="False" />
                 <ContentControl Content="{Binding DiskTile}" ContentTemplate="{StaticResource StatTileTemplate}" Focusable="False" />
             </UniformGrid>
+
+            <!-- Tiến trình nặng nhất -->
+            <Grid Margin="0,4,0,0" Visibility="{Binding TopMemory, Converter={StaticResource EmptyToCollapsed}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource Card}" Padding="16,14" Margin="0,0,0,12">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE9D9;" FontSize="14" Foreground="{DynamicResource AccentBrush}" />
+                            <TextBlock Text="{l:T dash.top_cpu}" Style="{StaticResource H3}" Margin="8,0,0,0" />
+                        </StackPanel>
+                        <TextBlock Text="{l:T dash.top_cpu_idle}" Style="{StaticResource Caption}"
+                                   Visibility="{Binding TopCpu, Converter={StaticResource EmptyToCollapsed}, ConverterParameter=invert}" />
+                        <ItemsControl ItemsSource="{Binding TopCpu}" ItemTemplate="{StaticResource ProcessRowTemplate}" Focusable="False" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource Card}" Padding="16,14" Margin="0,0,0,12">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE964;" FontSize="14" Foreground="{DynamicResource AccentBrush}" />
+                            <TextBlock Text="{l:T dash.top_memory}" Style="{StaticResource H3}" Margin="8,0,0,0" />
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding TopMemory}" ItemTemplate="{StaticResource ProcessRowTemplate}" Focusable="False" />
+                    </StackPanel>
+                </Border>
+            </Grid>
 
             <!-- Các nhóm kiểm tra -->
             <StackPanel Visibility="{Binding HasResult, Converter={StaticResource BoolToVis}}">
