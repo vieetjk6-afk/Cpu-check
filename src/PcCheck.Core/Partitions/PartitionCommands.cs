@@ -94,6 +94,15 @@ public static class PartitionCommands
         $"{Letter(source)}:\\ \"{Letter(target)}:\\{folder}\" /E /COPY:DAT /DCOPY:DAT /R:1 /W:1 /XJ /MT:8 /NP /NFL /NDL " +
         "/XD \"System Volume Information\" \"$RECYCLE.BIN\" \"Recovery\" /XF pagefile.sys hiberfil.sys swapfile.sys";
 
+    /// <summary>Chép toàn bộ ổ nguồn sang gốc ổ đích (khi dời phân vùng), giữ thuộc tính, quyền và chủ sở hữu.</summary>
+    public static string MoveCopyArgs(char source, char target) =>
+        $"{Letter(source)}:\\ {Letter(target)}:\\ /E /COPY:DATSO /DCOPY:DAT /B /R:1 /W:1 /XJ /MT:8 /NP /NFL /NDL " +
+        "/XD \"System Volume Information\" \"$RECYCLE.BIN\" /XF pagefile.sys hiberfil.sys swapfile.sys";
+
+    /// <summary>Xóa phân vùng theo ký tự ổ (dọn phân vùng tạm khi dời thất bại).</summary>
+    public static string DeleteByLetter(char letter) =>
+        $"Get-Partition -DriveLetter {Letter(letter)} | Remove-Partition -Confirm:$false";
+
     /// <summary>Tên thư mục chứa dữ liệu chuyển sang khi gộp: "Gop tu D" / "Merged from D".</summary>
     public static string MergeFolderName(char source, string prefix)
     {

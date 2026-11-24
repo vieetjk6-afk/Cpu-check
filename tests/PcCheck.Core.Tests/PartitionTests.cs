@@ -210,6 +210,53 @@ public sealed class PartitionTests
     }
 
     [Fact]
+    public void MovesDataPartitionSittingBetweenCAndFreeSpace()
+    {
+        // C: | Recovery | D: (20 GB dữ liệu / 100 GB) | trống 80 GB
+        var c = Part(1, MiB, 100 * GiB, letter: 'C', windows: true, free: 40 * GiB);
+        var rec = Part(2, c.End, 700 * MiB, PartitionKind.Recovery);
+        var d = Part(3, rec.End, 100 * GiB, letter: 'D', free: 80 * GiB);
+        var disk = Disk(d.End + 80 * GiB + MiB, PartitionStyle.Gpt, true, c, rec, d);
+
+        Assert.Null(PartitionLayout.Blocker(disk, c, PartitionOp.MoveNextAndExtend));
+        foreach (var selected in new[] { c, d })
+        {
+            Assert.Null(PartitionLayout.FindMovePlan(disk, selected, out var plan));
+            Assert.Same(c, plan!.Grow);
+            Assert.Same(d, plan.Move);
+            Assert.Same(rec, Assert.Single(plan.Recoveries));
+        }
+
+        PartitionLayout.PlanMoveAndExtend(disk, c, out var p);
+        Assert.Equal(21 * GiB, p!.MinNewSize);
+        Assert.Equal(80 * GiB, p.MaxNewSize);
+        Assert.Equal(80 * GiB, p.DefaultNewSize); // D: cũ 100 GB nhưng vùng trống chỉ 80 GB
+        Assert.Equal(p.Free.End - 30 * GiB, p.NewOffset(30 * GiB));
+        Assert.Equal(p.Free.End - 30 * GiB - c.Offset, p.GrowFinalSize(30 * GiB));
+    }
+
+    [Fact]
+    public void MoveNeedsEnoughFreeSpaceForTheData()
+    {
+        var c = Part(1, MiB, 100 * GiB, letter: 'C', windows: true);
+        var d = Part(2, c.End, 100 * GiB, letter: 'D', free: 10 * GiB); // 90 GB dữ liệu
+        var disk = Disk(d.End + 50 * GiB, PartitionStyle.Gpt, true, c, d);
+        Assert.Equal("part.block.move_no_room", PartitionLayout.PlanMoveAndExtend(disk, c, out _));
+
+        var noFree = Disk(d.End + MiB, PartitionStyle.Gpt, true, c, d);
+        Assert.Equal("part.block.move_no_free", PartitionLayout.PlanMoveAndExtend(noFree, c, out _));
+    }
+
+    [Fact]
+    public void MoveCopyArgumentsKeepPermissions()
+    {
+        var args = PartitionCommands.MoveCopyArgs('d', 'z');
+        Assert.StartsWith(@"D:\ Z:\ /E /COPY:DATSO", args);
+        Assert.Contains("/B", args);
+        Assert.Equal("Get-Partition -DriveLetter Z | Remove-Partition -Confirm:$false", PartitionCommands.DeleteByLetter('z'));
+    }
+
+    [Fact]
     public void MergeCopyNeedsRoomForTheData()
     {
         var keep = Part(1, MiB, 100 * GiB, letter: 'C', free: 30 * GiB);

@@ -92,6 +92,9 @@ public static class PartitionService
                 Log.Info($"robocopy merge {source}: -> {target}:\\{folder}: exit {copy.ExitCode}\n{Tail(copy.Output, 2000)}");
                 if (copy.Cancelled) return new PartitionOpResult(false, "cancelled");
                 if (!PartitionCommands.RobocopySucceeded(copy.ExitCode)) return new PartitionOpResult(false, $"robocopy exit {copy.ExitCode}: {Tail(copy.Output, 400)}");
+
+                // Chép từ gốc ổ khiến robocopy gán thuộc tính ẩn + hệ thống của gốc ổ cho thư mục đích – bỏ đi để thấy được trong Explorer.
+                await HiddenProcess.RunAsync(SystemExe("attrib.exe"), $"-h -s \"{target}:\\{folder}\"", ct, oem: true).ConfigureAwait(false);
             }
 
             var winre = await RemoveRecoveryAsync(plan.Recoveries, progress, ct).ConfigureAwait(false);
@@ -105,6 +108,53 @@ public static class PartitionService
             var extend = await PowerShellAsync(PartitionCommands.ExtendToMax(keep.DiskNumber, keep.PartitionNumber), ct).ConfigureAwait(false);
             return await RestoreWinReAsync(plan.Recoveries, extend, ct).ConfigureAwait(false);
         });
+
+    /// <summary>
+    /// Dời phân vùng ra sau rồi mở rộng phân vùng phía trước (xem <see cref="PartitionLayout.PlanMoveAndExtend"/>):
+    /// (1) tạo phân vùng mới ở cuối vùng trống với ký tự tạm, (2) chép toàn bộ dữ liệu sang – lỗi thì xóa phân vùng mới và dừng,
+    /// phân vùng cũ còn nguyên, (3) xóa phân vùng khôi phục ở giữa (nếu có) và phân vùng cũ, (4) gán ký tự cũ cho phân vùng mới,
+    /// (5) mở rộng phân vùng phía trước chiếm toàn bộ vùng trống.
+    /// </summary>
+    public static Task<PartitionOpResult> MoveAndExtendAsync(MovePlan plan, long newSize, char tempLetter, IProgress<string>? progress = null, CancellationToken ct = default) =>
+        ExclusiveAsync(async () =>
+        {
+            var move = plan.Move;
+            if (move.DriveLetter is not { } letter) return new PartitionOpResult(false, "no drive letter");
+            var temp = PartitionCommands.Letter(tempLetter);
+
+            progress?.Report("create");
+            var create = await PowerShellAsync(PartitionCommands.Create(move.DiskNumber, plan.NewOffset(newSize), newSize, temp, move.FileSystem, move.Label, false), ct).ConfigureAwait(false);
+            if (!create.Success) return create;
+
+            progress?.Report("copy");
+            var copy = await HiddenProcess.RunAsync(SystemExe("robocopy.exe"), PartitionCommands.MoveCopyArgs(letter, temp), ct, oem: true).ConfigureAwait(false);
+            Log.Info($"robocopy move {letter}: -> {temp}: exit {copy.ExitCode}\n{Tail(copy.Output, 2000)}");
+            if (copy.Cancelled || !PartitionCommands.RobocopySucceeded(copy.ExitCode))
+            {
+                var cleanup = await PowerShellAsync(PartitionCommands.DeleteByLetter(temp), CancellationToken.None).ConfigureAwait(false);
+                Log.Info($"Xóa phân vùng tạm {temp}: {cleanup.Success}");
+                return new PartitionOpResult(false, copy.Cancelled ? "cancelled" : $"robocopy exit {copy.ExitCode}: {Tail(copy.Output, 400)}");
+            }
+
+            var winre = await RemoveRecoveryAsync(plan.Recoveries, progress, ct).ConfigureAwait(false);
+            if (!winre.Success) return winre;
+
+            progress?.Report("delete");
+            var delete = await PowerShellAsync(PartitionCommands.Delete(move.DiskNumber, move.PartitionNumber), ct).ConfigureAwait(false);
+            if (!delete.Success) return await RestoreWinReAsync(plan.Recoveries, delete, ct).ConfigureAwait(false);
+
+            progress?.Report("letter");
+            var relabel = await PowerShellAsync(PartitionCommands.ChangeLetter(move.DiskNumber, 0, temp, letter), ct).ConfigureAwait(false);
+            if (!relabel.Success) Log.Warn($"Không gán lại được ký tự {letter}: cho phân vùng mới ({temp}:)");
+
+            progress?.Report("extend");
+            var extend = await PowerShellAsync(PartitionCommands.ExtendToMax(plan.Grow.DiskNumber, plan.Grow.PartitionNumber), ct).ConfigureAwait(false);
+            var result = await RestoreWinReAsync(plan.Recoveries, extend, ct).ConfigureAwait(false);
+            return result.Success && !relabel.Success ? result with { Detail = LetterNotRestored + temp } : result;
+        });
+
+    /// <summary>Đánh dấu: dời xong nhưng phân vùng mới vẫn mang ký tự tạm (theo sau là ký tự đó).</summary>
+    public const string LetterNotRestored = "letter:";
 
     /// <summary>Mở rộng qua phân vùng khôi phục đang chắn: dời WinRE vào ổ Windows, xóa phân vùng khôi phục, rồi mở rộng.</summary>
     public static Task<PartitionOpResult> ExtendOverRecoveryAsync(PartitionInfo partition, IReadOnlyList<PartitionInfo> recoveries, long size, IProgress<string>? progress = null, CancellationToken ct = default) =>

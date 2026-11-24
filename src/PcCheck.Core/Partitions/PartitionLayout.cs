@@ -15,6 +15,9 @@ public enum PartitionOp
     Merge,
     ConvertToNtfs,
     CheckFileSystem,
+
+    /// <summary>Dời phân vùng dữ liệu phía sau ra cuối vùng trống (tạo mới + chép + xóa cũ) để phân vùng này mở rộng.</summary>
+    MoveNextAndExtend,
 }
 
 /// <summary>
@@ -32,6 +35,27 @@ public sealed record ExtendPlan(FreeRegion Free, IReadOnlyList<PartitionInfo> Re
 {
     /// <summary>Kích thước tối đa của phân vùng sau khi mở rộng.</summary>
     public long MaxSize(PartitionInfo p) => PartitionLayout.AlignDown(Free.End - p.Offset);
+}
+
+/// <param name="Grow">Phân vùng được mở rộng (vd C:).</param>
+/// <param name="Move">Phân vùng bị dời ra sau (vd D:) – dữ liệu được chép sang phân vùng mới.</param>
+/// <param name="Free">Vùng trống ngay sau phân vùng bị dời.</param>
+/// <param name="Recoveries">Phân vùng khôi phục giữa Grow và Move, xóa kèm (WinRE chuyển vào ổ Windows).</param>
+public sealed record MovePlan(PartitionInfo Grow, PartitionInfo Move, FreeRegion Free, IReadOnlyList<PartitionInfo> Recoveries)
+{
+    /// <summary>Phân vùng mới nhỏ nhất: dữ liệu hiện có + 1 GB.</summary>
+    public long MinNewSize => PartitionLayout.AlignUp((Move.UsedBytes ?? Move.Size) + PartitionLayout.GiB);
+
+    public long MaxNewSize => PartitionLayout.AlignDown(Free.Size);
+
+    /// <summary>Mặc định giữ nguyên dung lượng cũ của phân vùng bị dời (nếu vùng trống đủ).</summary>
+    public long DefaultNewSize => Math.Clamp(PartitionLayout.AlignDown(Move.Size), MinNewSize, Math.Max(MinNewSize, MaxNewSize));
+
+    /// <summary>Vị trí phân vùng mới: đặt sát cuối vùng trống để phần còn lại liền với phân vùng được mở rộng.</summary>
+    public long NewOffset(long size) => PartitionLayout.AlignDown(Free.End - size);
+
+    /// <summary>Dung lượng của phân vùng được mở rộng sau khi xong (ước tính).</summary>
+    public long GrowFinalSize(long newSize) => NewOffset(newSize) - Grow.Offset;
 }
 
 public static class PartitionLayout
@@ -199,6 +223,9 @@ public static class PartitionLayout
             case PartitionOp.CheckFileSystem:
                 return p.DriveLetter is null || p.FileSystem.Length == 0 ? "part.block.no_letter" : null;
 
+            case PartitionOp.MoveNextAndExtend:
+                return PlanMoveAndExtend(disk, p, out _);
+
             case PartitionOp.Merge:
                 return PlanMerge(disk, p, out _);
         }
@@ -292,6 +319,64 @@ public static class PartitionLayout
         disk.Partitions.Where(p => p.IsLogical == partition.IsLogical && p.Offset >= partition.End).OrderBy(p => p.Offset);
 
     /// <summary>Đủ chỗ trống trong phân vùng giữ lại để chép toàn bộ dữ liệu của phân vùng bị gộp (chừa 1 GB).</summary>
+    /// <summary>
+    /// Mô phỏng "di chuyển phân vùng" của Partition Magic bằng công cụ Windows: bố cục C: | (Recovery) | D: | vùng trống →
+    /// tạo phân vùng mới ở cuối vùng trống, chép toàn bộ D: sang, xóa D: cũ (và Recovery), gán lại ký tự D:, rồi mở rộng C:.
+    /// Dữ liệu D: giữ nguyên ở phân vùng mới. Cần vùng trống đủ chứa dữ liệu của D:.
+    /// </summary>
+    public static string? PlanMoveAndExtend(PhysicalDiskInfo disk, PartitionInfo grow, out MovePlan? plan)
+    {
+        plan = null;
+        if (grow.Kind != PartitionKind.Data || !grow.HasVolume || grow.IsLogical) return "part.block.kind";
+        if (!CanExtendFileSystem(grow.FileSystem)) return "part.block.extend_fs";
+
+        var recoveries = new List<PartitionInfo>();
+        PartitionInfo? move = null;
+        foreach (var p in After(disk, grow))
+        {
+            if (p.Kind == PartitionKind.Recovery && move is null)
+            {
+                recoveries.Add(p);
+                continue;
+            }
+
+            move = p;
+            break;
+        }
+
+        if (move is null || move.Kind != PartitionKind.Data || move.IsLogical) return "part.block.no_next";
+        if (CriticalReason(disk, move) is { } critical) return critical + "_next";
+        if (move.DriveLetter is null || move.UsedBytes is null || !FileSystems.Contains(move.FileSystem, StringComparer.OrdinalIgnoreCase)) return "part.block.move_source";
+        var free = FreeAfter(disk, move);
+        if (free is null) return "part.block.move_no_free";
+        if (disk.Style == PartitionStyle.Mbr && disk.Partitions.Count(p => !p.IsLogical) >= 4) return "part.block.mbr_full";
+
+        var candidate = new MovePlan(grow, move, free, recoveries);
+        if (candidate.MinNewSize > candidate.MaxNewSize) return "part.block.move_no_room";
+        if (FileSystemBlocker(move.FileSystem, candidate.MinNewSize) is not null) return "part.block.move_source";
+        plan = candidate;
+        return null;
+    }
+
+    /// <summary>Tìm kế hoạch dời phân vùng cho mục đang chọn: chọn C: (phân vùng được mở rộng) hoặc chọn D: (phân vùng bị dời).</summary>
+    public static string? FindMovePlan(PhysicalDiskInfo disk, PartitionInfo selected, out MovePlan? plan)
+    {
+        var direct = PlanMoveAndExtend(disk, selected, out plan);
+        if (direct is null) return null;
+        var previous = disk.Partitions
+            .Where(p => !p.IsLogical && p.End <= selected.Offset && p.Kind == PartitionKind.Data)
+            .OrderByDescending(p => p.Offset)
+            .FirstOrDefault();
+        if (previous is not null && PlanMoveAndExtend(disk, previous, out var other) is null && ReferenceEquals(other!.Move, selected))
+        {
+            plan = other;
+            return null;
+        }
+
+        plan = null;
+        return direct;
+    }
+
     public static bool CanCopyForMerge(PartitionInfo keep, PartitionInfo removed) =>
         keep.FreeBytes is { } free && removed.UsedBytes is { } used && removed.DriveLetter is not null && keep.DriveLetter is not null
         && free - GiB >= used;

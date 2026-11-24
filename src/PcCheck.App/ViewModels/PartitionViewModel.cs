@@ -176,6 +176,7 @@ public enum PartitionEditor
     Letter,
     Label,
     Merge,
+    Move,
 }
 
 /// <summary>
@@ -207,6 +208,7 @@ public sealed class PartitionViewModel : PageViewModel
     private PartitionSizeRange? _range;
     private MergePlan? _mergePlan;
     private ExtendPlan? _extendPlan;
+    private MovePlan? _movePlan;
 
     public PartitionViewModel(MainViewModel main) : base(main)
     {
@@ -397,6 +399,17 @@ public sealed class PartitionViewModel : PageViewModel
                 Actions[^1] = new PartitionAction(last.Key, last.Glyph, Loc.F("part.action.merge_into", Name(plan.Removed), Name(plan.Keep)), null, true, last.Command);
             }
 
+            // "Dời D: ra sau để C: lấy vùng trống" – chỉ hiện khi bố cục phù hợp (hoặc chỉ thiếu chỗ / ổ MBR đầy để giải thích).
+            var moveBlocker = PartitionLayout.FindMovePlan(disk, p, out var move);
+            if (moveBlocker is null && move is not null)
+            {
+                Actions.Insert(Actions.Count - 1, new PartitionAction("move", "\uE8DE", Loc.F("part.action.move_extend", Name(move.Move), Name(move.Grow)), null, false, new RelayCommand(OpenMove)));
+            }
+            else if (moveBlocker is "part.block.move_no_room" or "part.block.mbr_full")
+            {
+                Actions.Insert(Actions.Count - 1, new PartitionAction("move", "\uE8DE", Loc.T("part.action.move"), moveBlocker, false, new RelayCommand(OpenMove)));
+            }
+
             Add(Actions, "letter", "", PartitionOp.ChangeLetter, false, OpenLetter);
             Add(Actions, "remove_letter", "", PartitionOp.RemoveLetter, false, () => _ = RemoveLetterAsync());
             Add(Actions, "label", "", PartitionOp.Label, false, OpenLabel);
@@ -463,13 +476,13 @@ public sealed class PartitionViewModel : PageViewModel
     }
 
     public bool IsEditing => Editor != PartitionEditor.None;
-    public bool ShowSize => Editor is PartitionEditor.Shrink or PartitionEditor.Extend or PartitionEditor.Create;
+    public bool ShowSize => Editor is PartitionEditor.Shrink or PartitionEditor.Extend or PartitionEditor.Create or PartitionEditor.Move;
     public bool ShowFileSystem => Editor is PartitionEditor.Create or PartitionEditor.Format;
     public bool ShowLabel => Editor is PartitionEditor.Create or PartitionEditor.Format or PartitionEditor.Label;
     public bool ShowLetters => Editor is PartitionEditor.Create or PartitionEditor.Letter;
     public bool ShowFullFormat => Editor is PartitionEditor.Create or PartitionEditor.Format;
     public bool ShowMerge => Editor == PartitionEditor.Merge;
-    public bool ApplyIsDanger => Editor is PartitionEditor.Format or PartitionEditor.Merge;
+    public bool ApplyIsDanger => Editor is PartitionEditor.Format or PartitionEditor.Merge or PartitionEditor.Move;
 
     public string EditorTitle => Editor == PartitionEditor.None ? "" : Loc.T("part.action." + Editor.ToString().ToLowerInvariant());
 
@@ -482,6 +495,10 @@ public sealed class PartitionViewModel : PageViewModel
         PartitionEditor.Letter => Loc.T("part.hint.letter"),
         PartitionEditor.Label => "",
         PartitionEditor.Merge => MergeHint,
+        PartitionEditor.Move => _movePlan is { } mp
+            ? Loc.F("part.hint.move", Name(mp.Move), Name(mp.Grow), Format.Bytes(mp.Move.UsedBytes ?? 0))
+              + (mp.Recoveries.Count > 0 ? " " + Loc.F("part.hint.merge_recovery", Format.Bytes(mp.Recoveries.Sum(r => r.Size))) : "")
+            : "",
         _ => "",
     };
 
@@ -528,6 +545,12 @@ public sealed class PartitionViewModel : PageViewModel
     {
         get
         {
+            if (Editor == PartitionEditor.Move && _movePlan is { } mp)
+            {
+                var newSize = PartitionLayout.ParseGigabytes(SizeText) ?? mp.DefaultNewSize;
+                return Loc.F("part.move_result", Name(mp.Grow), Format.Bytes(mp.GrowFinalSize(newSize)), Name(mp.Move), Format.Bytes(newSize));
+            }
+
             if (Editor is not (PartitionEditor.Shrink or PartitionEditor.Extend) || _selected?.Partition is not { } p) return "";
             var target = PartitionLayout.ParseGigabytes(SizeText) ?? 0;
             var diff = target - p.Size;
@@ -699,6 +722,54 @@ public sealed class PartitionViewModel : PageViewModel
         OnPropertyChanged(nameof(LabelMax));
     }
 
+    private void OpenMove()
+    {
+        if (_selected?.Partition is not { } p) return;
+        if (PartitionLayout.FindMovePlan(_selected.Disk, p, out var plan) is not null || plan is null) return;
+        _movePlan = plan;
+        SetRange(plan.MinNewSize, plan.MaxNewSize, plan.DefaultNewSize);
+        EditorError = "";
+        Editor = PartitionEditor.Move;
+        OnPropertyChanged(nameof(EditorHint));
+        OnPropertyChanged(nameof(SizeChangeText));
+    }
+
+    private async Task ApplyMoveAsync()
+    {
+        if (_movePlan is not { } plan || ValidatedSize() is not { } size) return;
+        if (PartitionLayout.FileSystemBlocker(plan.Move.FileSystem, size) is { } fsError)
+        {
+            EditorError = Loc.T(fsError);
+            return;
+        }
+
+        var used = new List<char>();
+        try
+        {
+            used.AddRange(DriveInfo.GetDrives().Select(d => d.Name[0]));
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Đọc danh sách ký tự ổ lỗi", ex);
+        }
+
+        used.AddRange(_disks.SelectMany(d => d.Partitions).Select(p => p.DriveLetter).OfType<char>());
+        var free = PartitionLayout.FreeLetters(used);
+        if (free.Count == 0)
+        {
+            EditorError = Loc.T("part.error.no_letter");
+            return;
+        }
+
+        var temp = free[^1];
+        var message = Loc.F("part.confirm.move", Name(plan.Move), Name(plan.Grow), Format.Bytes(plan.GrowFinalSize(size)), UsageText(plan.Move));
+        if (plan.Recoveries.Count > 0) message += " " + Loc.T("part.confirm.recovery_note");
+        if (!await Main.ConfirmAsync(EditorTitle, message, Loc.T("part.apply"), danger: true)) return;
+
+        var progress = new Progress<string>(stage => BusyText = Loc.T($"part.busy.move_{stage}"));
+        await RunAsync(Loc.T("part.busy.move_create"), () => PartitionService.MoveAndExtendAsync(plan, size, temp, progress), Loc.T("part.done.move"));
+    }
+
     private void OpenMerge()
     {
         if (_selected?.Partition is not { } p) return;
@@ -767,6 +838,9 @@ public sealed class PartitionViewModel : PageViewModel
                 break;
             case PartitionEditor.Merge:
                 await ApplyMergeAsync(s);
+                break;
+            case PartitionEditor.Move:
+                await ApplyMoveAsync();
                 break;
         }
     }
@@ -1013,6 +1087,7 @@ public sealed class PartitionViewModel : PageViewModel
 
         var message = !result.Success ? ErrorText(result, "part.failed")
             : result.Detail == PartitionService.WinReNotRestored ? doneText + " " + Loc.T("part.winre_not_restored")
+            : result.Detail.StartsWith(PartitionService.LetterNotRestored, StringComparison.Ordinal) ? doneText + " " + Loc.F("part.letter_not_restored", result.Detail[PartitionService.LetterNotRestored.Length..] + ":")
             : doneText;
         Main.ShowToast(message, !result.Success);
         await LoadSafeAsync();
