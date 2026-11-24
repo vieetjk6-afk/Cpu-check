@@ -66,6 +66,7 @@ public sealed class MainViewModel : ObservableObject
         Drivers = new DriversViewModel(this);
         Cleanup = new CleanupViewModel(this);
         Storage = new StorageViewModel(this);
+        Partitions = new PartitionViewModel(this);
         Issues = new IssuesViewModel(this);
         Security = new SecurityViewModel(this);
         Settings = new SettingsViewModel(this);
@@ -81,6 +82,7 @@ public sealed class MainViewModel : ObservableObject
             new(Pages.Drivers, "nav.drivers", "", Drivers),
             new(Pages.Cleanup, "nav.cleanup", "", Cleanup),
             new(Pages.Storage, "nav.storage", "\uEDA2", Storage),
+            new(Pages.Partitions, "nav.partitions", "\uECA5", Partitions),
             new(Pages.Issues, "nav.issues", "", Issues),
             new(Pages.Security, "nav.security", "\uEA18", Security),
             new(Pages.Widget, "nav.widget", "\uE718", Widget),
@@ -127,6 +129,7 @@ public sealed class MainViewModel : ObservableObject
     public DriversViewModel Drivers { get; }
     public CleanupViewModel Cleanup { get; }
     public StorageViewModel Storage { get; }
+    public PartitionViewModel Partitions { get; }
     public IssuesViewModel Issues { get; }
     public SecurityViewModel Security { get; }
     public SettingsViewModel Settings { get; }
@@ -144,6 +147,7 @@ public sealed class MainViewModel : ObservableObject
             if (value is null || !Set(ref _selectedNav, value)) return;
             OnPropertyChanged(nameof(CurrentPage));
             OnPropertyChanged(nameof(IsSettingsSelected));
+            value.Page.OnShown();
         }
     }
 
@@ -420,6 +424,7 @@ public sealed class MainViewModel : ObservableObject
             if (Cleanup.Session?.IsBusy == true) work.Add(Loc.T("exit.work.uninstall"));
             if (Security.IsDefenderScanning) work.Add(Loc.T("exit.work.scan"));
             if (_checkingDisk) work.Add(Loc.T("exit.work.disk"));
+            if (PcCheck.Core.Partitions.PartitionService.IsRunning) work.Add(Loc.T("exit.work.partition"));
             return string.Join(", ", work);
         }
     }

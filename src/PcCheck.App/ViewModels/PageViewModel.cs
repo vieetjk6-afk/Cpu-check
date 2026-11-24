@@ -30,6 +30,11 @@ public abstract class PageViewModel : ObservableObject
 
     protected abstract void Rebuild();
 
+    /// <summary>Gọi mỗi khi trang được mở trên thanh bên.</summary>
+    public virtual void OnShown()
+    {
+    }
+
     /// <summary>Gọi khoảng 2 giây/lần khi có số liệu cảm biến mới.</summary>
     protected virtual void OnLive()
     {
