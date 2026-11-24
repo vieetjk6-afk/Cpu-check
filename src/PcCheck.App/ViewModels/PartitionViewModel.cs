@@ -205,7 +205,8 @@ public sealed class PartitionViewModel : PageViewModel
     private string _resultText = "";
     private bool _resultIsError;
     private PartitionSizeRange? _range;
-    private PartitionInfo? _mergeNext;
+    private MergePlan? _mergePlan;
+    private ExtendPlan? _extendPlan;
 
     public PartitionViewModel(MainViewModel main) : base(main)
     {
@@ -390,6 +391,12 @@ public sealed class PartitionViewModel : PageViewModel
             Add(Actions, "shrink", "", PartitionOp.Shrink, false, () => _ = OpenResizeAsync(shrink: true));
             Add(Actions, "extend", "", PartitionOp.Extend, false, () => _ = OpenResizeAsync(shrink: false));
             Add(Actions, "merge", "", PartitionOp.Merge, true, OpenMerge);
+            if (PartitionLayout.PlanMerge(disk, p, out var plan) is null && plan is not null)
+            {
+                var last = Actions[^1];
+                Actions[^1] = new PartitionAction(last.Key, last.Glyph, Loc.F("part.action.merge_into", Name(plan.Removed), Name(plan.Keep)), null, true, last.Command);
+            }
+
             Add(Actions, "letter", "", PartitionOp.ChangeLetter, false, OpenLetter);
             Add(Actions, "remove_letter", "", PartitionOp.RemoveLetter, false, () => _ = RemoveLetterAsync());
             Add(Actions, "label", "", PartitionOp.Label, false, OpenLabel);
@@ -469,7 +476,7 @@ public sealed class PartitionViewModel : PageViewModel
     public string EditorHint => Editor switch
     {
         PartitionEditor.Shrink => Loc.T("part.hint.shrink"),
-        PartitionEditor.Extend => Loc.T("part.hint.extend"),
+        PartitionEditor.Extend => _extendPlan is { Recoveries.Count: > 0 } ? Loc.T("part.hint.extend_recovery") : Loc.T("part.hint.extend"),
         PartitionEditor.Create => Loc.T("part.hint.create"),
         PartitionEditor.Format => Loc.T("part.hint.format"),
         PartitionEditor.Letter => Loc.T("part.hint.letter"),
@@ -559,16 +566,17 @@ public sealed class PartitionViewModel : PageViewModel
     {
         get
         {
-            if (_selected?.Partition is not { } keep || _mergeNext is not { } next) return "";
-            return Loc.F("part.hint.merge", Name(next), Name(keep), Format.Bytes(next.Size));
+            if (_mergePlan is not { } plan) return "";
+            var hint = Loc.F("part.hint.merge", Name(plan.Removed), Name(plan.Keep), Format.Bytes(plan.Removed.Size));
+            return plan.Recoveries.Count > 0 ? hint + " " + Loc.F("part.hint.merge_recovery", Format.Bytes(plan.Recoveries.Sum(r => r.Size))) : hint;
         }
     }
 
-    public string MergeCopyText => _selected?.Partition is { } keep && _mergeNext is { } next
-        ? Loc.F("part.merge_copy", Name(next), PartitionCommands.MergeFolderName(next.DriveLetter ?? 'X', Loc.T("part.merge_folder")), Name(keep))
+    public string MergeCopyText => _mergePlan is { } plan
+        ? Loc.F("part.merge_copy", Name(plan.Removed), PartitionCommands.MergeFolderName(plan.Removed.DriveLetter ?? 'X', Loc.T("part.merge_folder")), Name(plan.Keep))
         : "";
 
-    public string MergeNoCopyText => _mergeNext is { } n && !MergeCanCopy ? Loc.F("part.merge_no_copy", Name(n)) : "";
+    public string MergeNoCopyText => _mergePlan is { } plan && !MergeCanCopy ? Loc.F("part.merge_no_copy", Name(plan.Removed)) : "";
 
     private static string Name(PartitionInfo p) =>
         p.DriveLetter is { } l ? $"{l}:" : Loc.F("part.partition_n", p.PartitionNumber);
@@ -592,6 +600,20 @@ public sealed class PartitionViewModel : PageViewModel
     private async Task OpenResizeAsync(bool shrink)
     {
         if (_selected?.Partition is not { } p || !EnsureAdmin()) return;
+        _extendPlan = shrink ? null : PartitionLayout.PlanExtend(_selected.Disk, p);
+
+        // Phân vùng khôi phục chắn phía sau: Windows chưa cho mở rộng nên tự tính giới hạn theo vùng trống sau nó.
+        if (_extendPlan is { Recoveries.Count: > 0 } over)
+        {
+            var now = PartitionLayout.AlignDown(p.Size);
+            var limit = over.MaxSize(p);
+            SetRange(now, limit, limit);
+            EditorError = "";
+            Editor = PartitionEditor.Extend;
+            OnPropertyChanged(nameof(EditorHint));
+            return;
+        }
+
         BeginBusy(Loc.T("part.busy.size"));
         try
         {
@@ -634,6 +656,7 @@ public sealed class PartitionViewModel : PageViewModel
 
         EditorError = "";
         Editor = shrink ? PartitionEditor.Shrink : PartitionEditor.Extend;
+        OnPropertyChanged(nameof(EditorHint));
     }
 
     private void OpenCreate()
@@ -679,9 +702,9 @@ public sealed class PartitionViewModel : PageViewModel
     private void OpenMerge()
     {
         if (_selected?.Partition is not { } p) return;
-        if (PartitionLayout.MergeBlocker(_selected.Disk, p, out var next) is not null || next is null) return;
-        _mergeNext = next;
-        MergeCanCopy = PartitionLayout.CanCopyForMerge(p, next);
+        if (PartitionLayout.PlanMerge(_selected.Disk, p, out var plan) is not null || plan is null) return;
+        _mergePlan = plan;
+        MergeCanCopy = PartitionLayout.CanCopyForMerge(plan.Keep, plan.Removed);
         MergeCopy = MergeCanCopy;
         OnPropertyChanged(nameof(MergeCanCopy));
         OnPropertyChanged(nameof(MergeCopyText));
@@ -781,6 +804,15 @@ public sealed class PartitionViewModel : PageViewModel
         }
 
         var shrink = size < p.Size;
+        if (!shrink && _extendPlan is { Recoveries.Count: > 0 } over)
+        {
+            var warn = Loc.F("part.confirm.extend_recovery", Name(p), Format.Bytes(p.Size), Format.Bytes(size));
+            if (!await Main.ConfirmAsync(EditorTitle, warn, Loc.T("part.apply"), danger: true)) return;
+            var stages = new Progress<string>(stage => BusyText = Loc.T($"part.busy.merge_{stage}"));
+            await RunAsync(Loc.T("part.busy.merge_recovery"), () => PartitionService.ExtendOverRecoveryAsync(p, over.Recoveries, size, stages), Loc.T("part.done.resize"));
+            return;
+        }
+
         var message = shrink
             ? Loc.F("part.confirm.shrink", Name(p), Format.Bytes(p.Size), Format.Bytes(size))
             : Loc.F("part.confirm.extend", Name(p), Format.Bytes(p.Size), Format.Bytes(size));
@@ -838,16 +870,19 @@ public sealed class PartitionViewModel : PageViewModel
 
     private async Task ApplyMergeAsync(SegmentItem s)
     {
-        if (s.Partition is not { } keep || _mergeNext is not { } next) return;
+        if (s.Partition is null || _mergePlan is not { } plan) return;
+        var keep = plan.Keep;
+        var next = plan.Removed;
         var copy = MergeCopy && MergeCanCopy;
         var message = copy
             ? Loc.F("part.confirm.merge_copy", Name(next), Name(keep), UsageText(next))
             : Loc.F("part.confirm.merge", Name(next), Name(keep), UsageText(next));
+        if (plan.Recoveries.Count > 0) message += " " + Loc.T("part.confirm.recovery_note");
         if (!await Main.ConfirmAsync(EditorTitle, message, Loc.T("part.action.merge"), danger: true)) return;
 
         var progress = new Progress<string>(stage => BusyText = Loc.T($"part.busy.merge_{stage}"));
         await RunAsync(Loc.T("part.busy.merge_copy"),
-            () => PartitionService.MergeAsync(keep, next, copy, Loc.T("part.merge_folder"), progress),
+            () => PartitionService.MergeAsync(plan, copy, Loc.T("part.merge_folder"), progress),
             Loc.T("part.done.merge"));
     }
 
@@ -976,7 +1011,9 @@ public sealed class PartitionViewModel : PageViewModel
             EndBusy();
         }
 
-        var message = result.Success ? doneText : ErrorText(result, "part.failed");
+        var message = !result.Success ? ErrorText(result, "part.failed")
+            : result.Detail == PartitionService.WinReNotRestored ? doneText + " " + Loc.T("part.winre_not_restored")
+            : doneText;
         Main.ShowToast(message, !result.Success);
         await LoadSafeAsync();
         ResultText = message;

@@ -1580,7 +1580,7 @@
   "part.disk_actions": "DISK",
   "part.action.shrink": "Shrink",
   "part.action.extend": "Extend",
-  "part.action.merge": "Merge with next partition",
+  "part.action.merge": "Merge partitions",
   "part.action.letter": "Change drive letter",
   "part.action.remove_letter": "Remove drive letter (hide)",
   "part.action.label": "Rename (label)",
@@ -1614,7 +1614,7 @@
   "part.block.no_space_after": "There's no unallocated space right after this partition. Windows can only extend to the right.",
   "part.block.no_letter": "The partition has no drive letter.",
   "part.block.not_fat": "Only FAT / FAT32 / exFAT can be converted.",
-  "part.block.no_next": "There's no partition right after this one to merge.",
+  "part.block.no_next": "There's no adjacent data partition to merge with (only neighbouring partitions on the same disk can be merged).",
   "part.block.next_kind": "The next partition isn't a data partition (recovery, EFI...).",
   "part.block.mbr2gpt_data": "Windows can only convert MBR → GPT losslessly on the Windows disk. Data disks must be emptied first.",
   "part.hint.shrink": "Enter the new partition size. The freed space becomes unallocated space after it for a new partition. Data is kept.",
@@ -1694,5 +1694,12 @@
   "part.error.fs": "Unsupported file system.",
   "part.error.fat32_size": "Windows can only format FAT32 up to 32 GB – choose exFAT or NTFS.",
   "part.error.label_console": "The volume label has special characters – rename it using plain letters (or clear it) and try again.",
-  "part.error.mbr2gpt_validate": "The disk can't be converted to GPT: {0}"
+  "part.error.mbr2gpt_validate": "The disk can't be converted to GPT: {0}",
+  "part.action.merge_into": "Merge {0} into {1}",
+  "part.hint.extend_recovery": "A Recovery partition sits right after this one, so Windows won't extend it. PC Check will move the recovery environment (WinRE) into the Windows drive, delete the Recovery partition, then extend. Data is kept.",
+  "part.hint.merge_recovery": "The Recovery partition in between ({0}) is deleted too – the recovery environment (WinRE) is moved into the Windows drive first.",
+  "part.confirm.extend_recovery": "Extend {0} from {1} to {2}? The Recovery partition after it will be deleted (WinRE is moved into the Windows drive with reagentc). Data on {0} is kept. Back up first.",
+  "part.confirm.recovery_note": "The Recovery partition in between is deleted too (WinRE is moved into the Windows drive).",
+  "part.busy.merge_recovery": "Moving WinRE into the Windows drive and deleting the Recovery partition...",
+  "part.winre_not_restored": "Note: the recovery environment (WinRE) couldn't be re-enabled – run \"reagentc /enable\" as administrator to check."
 }

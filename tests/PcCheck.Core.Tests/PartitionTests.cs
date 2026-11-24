@@ -148,18 +148,65 @@ public sealed class PartitionTests
     {
         var disk = SystemDisk(out _, out _, out var c, out var d, out _);
 
-        // C: + D: (có vùng trống ở giữa) – gộp được, D: bị xóa.
-        Assert.Null(PartitionLayout.MergeBlocker(disk, c, out var next));
-        Assert.Same(d, next);
+        // Chọn C: -> giữ C:, xóa D: (có vùng trống ở giữa vẫn gộp được).
+        Assert.Null(PartitionLayout.PlanMerge(disk, c, out var plan));
+        Assert.Same(c, plan!.Keep);
+        Assert.Same(d, plan.Removed);
+        Assert.Empty(plan.Recoveries);
 
-        // D: + Recovery – phân vùng sau không phải dữ liệu.
-        Assert.Equal("part.block.next_kind", PartitionLayout.MergeBlocker(disk, d, out _));
+        // Chọn D: (phía sau chỉ có Recovery) -> gộp D: vào C:.
+        Assert.Null(PartitionLayout.PlanMerge(disk, d, out var back));
+        Assert.Same(c, back!.Keep);
+        Assert.Same(d, back.Removed);
 
         // Phân vùng sau chứa pagefile -> chặn.
         var e = Part(1, MiB, 50 * GiB, letter: 'E', free: 40 * GiB);
         var f = Part(2, e.End, 50 * GiB, letter: 'F', pagefile: true);
         var disk2 = Disk(f.End + MiB, PartitionStyle.Mbr, false, e, f);
-        Assert.Equal("part.block.pagefile_next", PartitionLayout.MergeBlocker(disk2, e, out _));
+        Assert.Equal("part.block.pagefile_next", PartitionLayout.PlanMerge(disk2, e, out _));
+        Assert.Equal("part.block.pagefile_next", PartitionLayout.PlanMerge(disk2, f, out _));
+    }
+
+    [Fact]
+    public void MergeAcrossRecoveryPartitionBetweenCAndD()
+    {
+        // Bố cục hay gặp: EFI | MSR | C: | Recovery | D:
+        var efi = Part(1, MiB, 100 * MiB, PartitionKind.Efi, "FAT32", boot: true);
+        var msr = Part(2, 101 * MiB, 16 * MiB, PartitionKind.Reserved);
+        var c = Part(3, 117 * MiB, 100 * GiB, letter: 'C', windows: true, free: 60 * GiB, pagefile: true);
+        var rec = Part(4, c.End, 700 * MiB, PartitionKind.Recovery);
+        var d = Part(5, rec.End, 300 * GiB, letter: 'D', free: 290 * GiB);
+        var disk = Disk(d.End + MiB, PartitionStyle.Gpt, true, efi, msr, c, rec, d);
+
+        foreach (var selected in new[] { c, d })
+        {
+            Assert.Null(PartitionLayout.PlanMerge(disk, selected, out var plan));
+            Assert.Same(c, plan!.Keep);
+            Assert.Same(d, plan.Removed);
+            Assert.Same(rec, Assert.Single(plan.Recoveries));
+        }
+
+        Assert.True(PartitionLayout.CanCopyForMerge(c, d)); // 10 GB dữ liệu, C: trống 60 GB
+
+    }
+
+    [Fact]
+    public void ExtendCOverRecoveryPartitionWhenFreeSpaceIsBehindIt()
+    {
+        var c = Part(1, MiB, 100 * GiB, letter: 'C', windows: true);
+        var rec = Part(2, c.End, 700 * MiB, PartitionKind.Recovery);
+        var disk = Disk(rec.End + 50 * GiB, PartitionStyle.Gpt, true, c, rec);
+
+        Assert.Null(PartitionLayout.FreeAfter(disk, c));
+        Assert.Null(PartitionLayout.Blocker(disk, c, PartitionOp.Extend));
+        var plan = PartitionLayout.PlanExtend(disk, c)!;
+        Assert.Same(rec, Assert.Single(plan.Recoveries));
+        Assert.Equal(disk.FreeRegions[0].End - c.Offset, plan.MaxSize(c));
+
+        // Recovery ở cuối ổ, không có vùng trống phía sau -> vẫn không mở rộng được.
+        var disk2 = Disk(rec.End + MiB, PartitionStyle.Gpt, true, c, rec);
+        Assert.Null(PartitionLayout.PlanExtend(disk2, c));
+        Assert.Equal("part.block.no_space_after", PartitionLayout.Blocker(disk2, c, PartitionOp.Extend));
     }
 
     [Fact]

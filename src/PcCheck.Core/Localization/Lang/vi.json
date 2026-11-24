@@ -1580,7 +1580,7 @@
   "part.disk_actions": "Ổ ĐĨA",
   "part.action.shrink": "Co phân vùng",
   "part.action.extend": "Mở rộng phân vùng",
-  "part.action.merge": "Gộp với phân vùng phía sau",
+  "part.action.merge": "Gộp phân vùng",
   "part.action.letter": "Đổi ký tự ổ",
   "part.action.remove_letter": "Bỏ ký tự ổ (ẩn ổ)",
   "part.action.label": "Đổi tên (nhãn)",
@@ -1614,7 +1614,7 @@
   "part.block.no_space_after": "Không có vùng trống liền ngay phía sau phân vùng. Windows chỉ mở rộng được sang phải.",
   "part.block.no_letter": "Phân vùng không có ký tự ổ.",
   "part.block.not_fat": "Chỉ chuyển được từ FAT / FAT32 / exFAT.",
-  "part.block.no_next": "Không có phân vùng nào liền phía sau để gộp.",
+  "part.block.no_next": "Không có phân vùng dữ liệu nào liền trước/sau để gộp (chỉ gộp được hai phân vùng kề nhau trên cùng một ổ).",
   "part.block.next_kind": "Phân vùng phía sau không phải phân vùng dữ liệu (khôi phục, EFI...).",
   "part.block.mbr2gpt_data": "Windows chỉ chuyển MBR → GPT giữ dữ liệu cho ổ chứa Windows. Ổ dữ liệu cần xóa hết phân vùng rồi chuyển.",
   "part.hint.shrink": "Nhập dung lượng mới của phân vùng. Phần giải phóng thành vùng trống phía sau để tạo phân vùng mới. Dữ liệu được giữ nguyên.",
@@ -1694,5 +1694,12 @@
   "part.error.fs": "Hệ thống tệp không hỗ trợ.",
   "part.error.fat32_size": "Windows chỉ format FAT32 cho phân vùng tối đa 32 GB – hãy chọn exFAT hoặc NTFS.",
   "part.error.label_console": "Nhãn ổ có ký tự đặc biệt/có dấu – hãy đổi nhãn thành chữ không dấu (hoặc xóa nhãn) rồi chuyển lại.",
-  "part.error.mbr2gpt_validate": "Ổ không đủ điều kiện chuyển GPT: {0}"
+  "part.error.mbr2gpt_validate": "Ổ không đủ điều kiện chuyển GPT: {0}",
+  "part.action.merge_into": "Gộp {0} vào {1}",
+  "part.hint.extend_recovery": "Phân vùng khôi phục (Recovery) đang chắn ngay phía sau nên Windows không cho mở rộng. PC Check sẽ chuyển môi trường khôi phục (WinRE) vào ổ Windows, xóa phân vùng khôi phục rồi mở rộng. Dữ liệu được giữ nguyên.",
+  "part.hint.merge_recovery": "Phân vùng khôi phục ở giữa ({0}) cũng được xóa – môi trường khôi phục (WinRE) được chuyển vào ổ Windows trước.",
+  "part.confirm.extend_recovery": "Mở rộng {0} từ {1} lên {2}? Phân vùng khôi phục phía sau sẽ bị xóa (WinRE được chuyển vào ổ Windows bằng reagentc). Dữ liệu trên {0} được giữ nguyên. Hãy sao lưu trước.",
+  "part.confirm.recovery_note": "Phân vùng khôi phục ở giữa cũng bị xóa (WinRE được chuyển vào ổ Windows).",
+  "part.busy.merge_recovery": "Đang chuyển WinRE vào ổ Windows và xóa phân vùng khôi phục...",
+  "part.winre_not_restored": "Lưu ý: không bật lại được môi trường khôi phục (WinRE) – chạy \"reagentc /enable\" với quyền quản trị để kiểm tra."
 }

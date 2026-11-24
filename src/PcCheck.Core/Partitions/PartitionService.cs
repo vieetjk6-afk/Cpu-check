@@ -74,12 +74,15 @@ public static class PartitionService
         ExclusiveAsync(() => PowerShellAsync(PartitionCommands.SetOnline(disk), ct));
 
     /// <summary>
-    /// Gộp: (1) chép dữ liệu của phân vùng bị gộp vào một thư mục trong phân vùng giữ lại (nếu chọn), (2) xóa phân vùng đó,
-    /// (3) mở rộng phân vùng giữ lại chiếm toàn bộ vùng trống. Dừng ngay nếu bước chép lỗi – không xóa gì.
+    /// Gộp: (1) chép dữ liệu của phân vùng bị gộp vào một thư mục trong phân vùng giữ lại (nếu chọn), (2) dời WinRE vào ổ
+    /// Windows và xóa phân vùng khôi phục nằm giữa (nếu có), (3) xóa phân vùng bị gộp, (4) mở rộng phân vùng giữ lại chiếm
+    /// toàn bộ vùng trống. Dừng ngay nếu bước chép lỗi – không xóa gì.
     /// </summary>
-    public static Task<PartitionOpResult> MergeAsync(PartitionInfo keep, PartitionInfo removed, bool copyData, string folderPrefix, IProgress<string>? progress = null, CancellationToken ct = default) =>
+    public static Task<PartitionOpResult> MergeAsync(MergePlan plan, bool copyData, string folderPrefix, IProgress<string>? progress = null, CancellationToken ct = default) =>
         ExclusiveAsync(async () =>
         {
+            var keep = plan.Keep;
+            var removed = plan.Removed;
             if (copyData)
             {
                 if (keep.DriveLetter is not { } target || removed.DriveLetter is not { } source) return new PartitionOpResult(false, "no drive letter");
@@ -91,13 +94,65 @@ public static class PartitionService
                 if (!PartitionCommands.RobocopySucceeded(copy.ExitCode)) return new PartitionOpResult(false, $"robocopy exit {copy.ExitCode}: {Tail(copy.Output, 400)}");
             }
 
+            var winre = await RemoveRecoveryAsync(plan.Recoveries, progress, ct).ConfigureAwait(false);
+            if (!winre.Success) return winre;
+
             progress?.Report("delete");
             var delete = await PowerShellAsync(PartitionCommands.Delete(removed.DiskNumber, removed.PartitionNumber), ct).ConfigureAwait(false);
-            if (!delete.Success) return delete;
+            if (!delete.Success) return await RestoreWinReAsync(plan.Recoveries, delete, ct).ConfigureAwait(false);
 
             progress?.Report("extend");
-            return await PowerShellAsync(PartitionCommands.ExtendToMax(keep.DiskNumber, keep.PartitionNumber), ct).ConfigureAwait(false);
+            var extend = await PowerShellAsync(PartitionCommands.ExtendToMax(keep.DiskNumber, keep.PartitionNumber), ct).ConfigureAwait(false);
+            return await RestoreWinReAsync(plan.Recoveries, extend, ct).ConfigureAwait(false);
         });
+
+    /// <summary>Mở rộng qua phân vùng khôi phục đang chắn: dời WinRE vào ổ Windows, xóa phân vùng khôi phục, rồi mở rộng.</summary>
+    public static Task<PartitionOpResult> ExtendOverRecoveryAsync(PartitionInfo partition, IReadOnlyList<PartitionInfo> recoveries, long size, IProgress<string>? progress = null, CancellationToken ct = default) =>
+        ExclusiveAsync(async () =>
+        {
+            var winre = await RemoveRecoveryAsync(recoveries, progress, ct).ConfigureAwait(false);
+            if (!winre.Success) return winre;
+
+            progress?.Report("extend");
+            var script = $"$s = Get-PartitionSupportedSize -DiskNumber {partition.DiskNumber.ToString(CultureInfo.InvariantCulture)} -PartitionNumber {partition.PartitionNumber.ToString(CultureInfo.InvariantCulture)}; " +
+                         $"$size = [Math]::Min([long]{size.ToString(CultureInfo.InvariantCulture)}, [long]$s.SizeMax); " +
+                         $"Resize-Partition -DiskNumber {partition.DiskNumber.ToString(CultureInfo.InvariantCulture)} -PartitionNumber {partition.PartitionNumber.ToString(CultureInfo.InvariantCulture)} -Size $size -Confirm:$false";
+            var extend = await PowerShellAsync(script, ct).ConfigureAwait(false);
+            return await RestoreWinReAsync(recoveries, extend, ct).ConfigureAwait(false);
+        });
+
+    /// <summary>
+    /// reagentc /disable chép winre.wim từ phân vùng khôi phục vào C:\Windows\System32\Recovery, sau đó xóa phân vùng khôi phục.
+    /// Nếu WinRE vốn không nằm ở đó (hoặc đã tắt), lệnh báo lỗi nhưng vẫn xóa tiếp – người dùng đã được cảnh báo.
+    /// </summary>
+    private static async Task<PartitionOpResult> RemoveRecoveryAsync(IReadOnlyList<PartitionInfo> recoveries, IProgress<string>? progress, CancellationToken ct)
+    {
+        if (recoveries.Count == 0) return new PartitionOpResult(true, "");
+        progress?.Report("recovery");
+        var disable = await HiddenProcess.RunAsync(SystemExe("reagentc.exe"), "/disable", ct, oem: true).ConfigureAwait(false);
+        Log.Info($"reagentc /disable: exit {disable.ExitCode}\n{disable.Output.Trim()}");
+        if (disable.Cancelled) return new PartitionOpResult(false, "cancelled");
+
+        foreach (var r in recoveries.OrderByDescending(r => r.PartitionNumber))
+        {
+            var delete = await PowerShellAsync(PartitionCommands.Delete(r.DiskNumber, r.PartitionNumber), ct).ConfigureAwait(false);
+            if (!delete.Success) return await RestoreWinReAsync(recoveries, delete, ct).ConfigureAwait(false);
+        }
+
+        return new PartitionOpResult(true, "");
+    }
+
+    /// <summary>Bật lại WinRE (giờ nằm trong ổ Windows) – lỗi ở bước này không làm hỏng kết quả chính, chỉ ghi chú thêm.</summary>
+    private static async Task<PartitionOpResult> RestoreWinReAsync(IReadOnlyList<PartitionInfo> recoveries, PartitionOpResult result, CancellationToken ct)
+    {
+        if (recoveries.Count == 0) return result;
+        var enable = await HiddenProcess.RunAsync(SystemExe("reagentc.exe"), "/enable", ct, oem: true).ConfigureAwait(false);
+        Log.Info($"reagentc /enable: exit {enable.ExitCode}\n{enable.Output.Trim()}");
+        return enable.ExitCode == 0 || !result.Success ? result : result with { Detail = WinReNotRestored };
+    }
+
+    /// <summary>Đánh dấu: thao tác xong nhưng không bật lại được WinRE.</summary>
+    public const string WinReNotRestored = "winre";
 
     /// <summary>Chuyển FAT/FAT32/exFAT sang NTFS mà giữ nguyên dữ liệu (lệnh convert của Windows).</summary>
     public static Task<PartitionOpResult> ConvertToNtfsAsync(char letter, string currentLabel, CancellationToken ct = default) =>

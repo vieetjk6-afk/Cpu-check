@@ -21,6 +21,19 @@ public enum PartitionOp
 /// Logic thuần (không gọi hệ thống, dễ kiểm thử): phân loại phân vùng, tính vùng trống, quy tắc an toàn cho từng thao tác,
 /// căn chỉnh kích thước và kiểm tra dữ liệu nhập.
 /// </summary>
+/// <param name="Keep">Phân vùng giữ lại và được mở rộng.</param>
+/// <param name="Removed">Phân vùng bị xóa (dữ liệu chép sang Keep nếu chọn).</param>
+/// <param name="Recoveries">Phân vùng khôi phục nằm giữa, xóa kèm (WinRE chuyển vào ổ Windows).</param>
+public sealed record MergePlan(PartitionInfo Keep, PartitionInfo Removed, IReadOnlyList<PartitionInfo> Recoveries);
+
+/// <param name="Free">Vùng trống sẽ mở rộng vào.</param>
+/// <param name="Recoveries">Phân vùng khôi phục chắn giữa, phải xóa trước khi mở rộng.</param>
+public sealed record ExtendPlan(FreeRegion Free, IReadOnlyList<PartitionInfo> Recoveries)
+{
+    /// <summary>Kích thước tối đa của phân vùng sau khi mở rộng.</summary>
+    public long MaxSize(PartitionInfo p) => PartitionLayout.AlignDown(Free.End - p.Offset);
+}
+
 public static class PartitionLayout
 {
     public const long MiB = 1024L * 1024;
@@ -123,19 +136,6 @@ public static class PartitionLayout
     public static FreeRegion? FreeAfter(PhysicalDiskInfo disk, PartitionInfo partition) =>
         disk.FreeRegions.FirstOrDefault(r => r.Offset >= partition.End && r.Offset - partition.End < MinFreeRegion);
 
-    /// <summary>
-    /// Phân vùng kế tiếp phía sau (để gộp) – được phép có vùng trống ở giữa vì sau khi xóa, vùng trống liền mạch.
-    /// Null nếu phía sau là phân vùng mở rộng (MBR) hoặc không còn phân vùng nào.
-    /// </summary>
-    public static PartitionInfo? NextPartition(PhysicalDiskInfo disk, PartitionInfo partition)
-    {
-        var next = disk.Partitions
-            .Where(p => p.IsLogical == partition.IsLogical && p.Offset >= partition.End)
-            .OrderBy(p => p.Offset)
-            .FirstOrDefault();
-        return next is { Kind: PartitionKind.Extended } ? null : next;
-    }
-
     public static bool CanExtendFileSystem(string fs) =>
         fs.Equals("NTFS", StringComparison.OrdinalIgnoreCase) || fs.Equals("ReFS", StringComparison.OrdinalIgnoreCase);
 
@@ -178,7 +178,7 @@ public static class PartitionLayout
             case PartitionOp.Extend:
                 if (p.Kind != PartitionKind.Data) return "part.block.kind";
                 if (!CanExtendFileSystem(p.FileSystem)) return "part.block.extend_fs";
-                return FreeAfter(disk, p) is null ? "part.block.no_space_after" : null;
+                return PlanExtend(disk, p) is null ? "part.block.no_space_after" : null;
 
             case PartitionOp.ChangeLetter:
             case PartitionOp.RemoveLetter:
@@ -200,23 +200,96 @@ public static class PartitionLayout
                 return p.DriveLetter is null || p.FileSystem.Length == 0 ? "part.block.no_letter" : null;
 
             case PartitionOp.Merge:
-                return MergeBlocker(disk, p, out _);
+                return PlanMerge(disk, p, out _);
         }
 
         return null;
     }
 
-    /// <summary>Gộp phân vùng p với phân vùng liền sau nó: xóa phân vùng sau (sau khi chép dữ liệu nếu chọn), rồi mở rộng p.</summary>
-    public static string? MergeBlocker(PhysicalDiskInfo disk, PartitionInfo p, out PartitionInfo? next)
+    /// <summary>
+    /// Lập kế hoạch gộp cho phân vùng đang chọn: ưu tiên giữ phân vùng này và gộp phân vùng phía sau vào; nếu không được thì
+    /// gộp phân vùng này vào phân vùng dữ liệu phía trước (vd chọn D: → gộp D: vào C:). Phân vùng khôi phục nằm giữa
+    /// (thường gặp: C: | Recovery | D:) được xóa kèm, môi trường khôi phục chuyển vào ổ Windows bằng reagentc.
+    /// </summary>
+    public static string? PlanMerge(PhysicalDiskInfo disk, PartitionInfo selected, out MergePlan? plan)
     {
-        next = null;
-        if (p.Kind != PartitionKind.Data || !p.HasVolume) return "part.block.kind";
-        if (!CanExtendFileSystem(p.FileSystem)) return "part.block.extend_fs";
-        next = NextPartition(disk, p);
-        if (next is null) return "part.block.no_next";
-        if (next.Kind is not (PartitionKind.Data or PartitionKind.Other)) return "part.block.next_kind";
-        return CriticalReason(disk, next) is { } critical ? critical + "_next" : null;
+        var forward = TryMergeInto(disk, selected, out plan);
+        if (forward is null) return null;
+
+        var previous = disk.Partitions
+            .Where(p => p.IsLogical == selected.IsLogical && p.End <= selected.Offset && p.Kind is PartitionKind.Data)
+            .OrderByDescending(p => p.Offset)
+            .FirstOrDefault();
+        string? backwardError = null;
+        if (previous is not null)
+        {
+            backwardError = TryMergeInto(disk, previous, out var backward);
+            if (backwardError is null && ReferenceEquals(backward!.Removed, selected))
+            {
+                plan = backward;
+                return null;
+            }
+        }
+
+        plan = null;
+        // Phía sau không có gì để gộp: lý do từ phía trước (vd phân vùng đang chọn chứa pagefile) hữu ích hơn.
+        return forward == "part.block.no_next" && backwardError is not null && backwardError != "part.block.no_next" && backwardError.EndsWith("_next", StringComparison.Ordinal)
+            ? backwardError
+            : forward;
     }
+
+    /// <summary>Giữ <paramref name="keep"/>, xóa phân vùng dữ liệu kế tiếp (và phân vùng khôi phục nằm giữa), rồi mở rộng keep.</summary>
+    internal static string? TryMergeInto(PhysicalDiskInfo disk, PartitionInfo keep, out MergePlan? plan)
+    {
+        plan = null;
+        if (keep.Kind != PartitionKind.Data || !keep.HasVolume) return "part.block.kind";
+        if (!CanExtendFileSystem(keep.FileSystem)) return "part.block.extend_fs";
+
+        var recoveries = new List<PartitionInfo>();
+        foreach (var p in After(disk, keep))
+        {
+            if (p.Kind == PartitionKind.Recovery)
+            {
+                recoveries.Add(p);
+                continue;
+            }
+
+            if (p.Kind == PartitionKind.Extended) return "part.block.no_next";
+            if (p.Kind is not (PartitionKind.Data or PartitionKind.Other)) return "part.block.next_kind";
+            if (CriticalReason(disk, p) is { } critical) return critical + "_next";
+            plan = new MergePlan(keep, p, recoveries);
+            return null;
+        }
+
+        return "part.block.no_next";
+    }
+
+    /// <summary>
+    /// Vùng có thể mở rộng vào: vùng trống liền sau, hoặc vùng trống nằm sau (các) phân vùng khôi phục chắn ngay phía sau
+    /// (trường hợp "Extend Volume" bị mờ trong Disk Management). Null nếu không mở rộng được.
+    /// </summary>
+    public static ExtendPlan? PlanExtend(PhysicalDiskInfo disk, PartitionInfo p)
+    {
+        if (FreeAfter(disk, p) is { } direct) return new ExtendPlan(direct, []);
+
+        var recoveries = new List<PartitionInfo>();
+        var cursor = p.End;
+        foreach (var next in After(disk, p))
+        {
+            if (next.Offset - cursor >= MinFreeRegion) break; // có vùng trống ở giữa – đã xét ở FreeAfter
+            if (next.Kind != PartitionKind.Recovery) break;
+            recoveries.Add(next);
+            cursor = next.End;
+        }
+
+        if (recoveries.Count == 0) return null;
+        var free = disk.FreeRegions.FirstOrDefault(r => r.Offset >= cursor && r.Offset - cursor < MinFreeRegion);
+        return free is null ? null : new ExtendPlan(free, recoveries);
+    }
+
+    /// <summary>Các phân vùng phía sau (cùng cấp chính/logic), theo thứ tự.</summary>
+    private static IEnumerable<PartitionInfo> After(PhysicalDiskInfo disk, PartitionInfo partition) =>
+        disk.Partitions.Where(p => p.IsLogical == partition.IsLogical && p.Offset >= partition.End).OrderBy(p => p.Offset);
 
     /// <summary>Đủ chỗ trống trong phân vùng giữ lại để chép toàn bộ dữ liệu của phân vùng bị gộp (chừa 1 GB).</summary>
     public static bool CanCopyForMerge(PartitionInfo keep, PartitionInfo removed) =>
