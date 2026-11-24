@@ -107,7 +107,7 @@
                         <ColumnDefinition Width="22" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Style="{StaticResource Icon}" Text="{Binding Glyph}" FontSize="13" HorizontalAlignment="Left">
+                    <TextBlock Text="{Binding Glyph}" FontSize="13" HorizontalAlignment="Left">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
                                 <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
