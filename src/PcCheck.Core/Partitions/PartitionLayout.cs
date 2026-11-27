@@ -130,7 +130,7 @@ public static class PartitionLayout
     public static List<FreeRegion> FreeRegions(PhysicalDiskInfo disk)
     {
         var regions = new List<FreeRegion>();
-        if (disk.Style == PartitionStyle.Raw || disk.Size <= 0) return regions;
+        if (disk.Style == PartitionStyle.Raw || disk.Size <= 0 || disk.PartitionsUnreadable) return regions;
 
         var start = MiB; // MBR / GPT header – Windows luôn căn phân vùng đầu ở 1 MB
         var end = disk.Style == PartitionStyle.Gpt ? disk.Size - MiB : disk.Size; // bảng GPT dự phòng ở cuối ổ
@@ -180,6 +180,7 @@ public static class PartitionLayout
     /// </summary>
     public static string? Blocker(PhysicalDiskInfo disk, PartitionInfo p, PartitionOp op)
     {
+        if (disk.PartitionsUnreadable) return "part.block.unreadable";
         if (disk.IsOffline) return "part.block.offline";
         if (disk.IsReadOnly) return "part.block.readonly";
         if (p.Kind == PartitionKind.Dynamic) return "part.block.dynamic";

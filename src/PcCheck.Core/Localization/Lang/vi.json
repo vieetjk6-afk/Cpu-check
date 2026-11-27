@@ -1719,5 +1719,7 @@
   "part.block.move_source": "Phân vùng phía sau phải là phân vùng dữ liệu có ký tự ổ, định dạng NTFS/exFAT/FAT32.",
   "part.block.move_no_free": "Không có vùng trống ngay sau phân vùng cần dời.",
   "part.block.move_no_room": "Vùng trống nhỏ hơn dữ liệu của phân vùng cần dời (+1 GB) – hãy dọn bớt dữ liệu hoặc dùng Gộp.",
-  "part.block.mbr_full": "Ổ MBR đã đủ 4 phân vùng chính – không tạo thêm được phân vùng mới."
+  "part.block.mbr_full": "Ổ MBR đã đủ 4 phân vùng chính – không tạo thêm được phân vùng mới.",
+  "part.block.unreadable": "Không đọc được bảng phân vùng của ổ này – để an toàn, mọi thao tác bị khóa. Bấm Làm mới hoặc dùng Disk Management.",
+  "part.unreadable_hint": "Không đọc được phân vùng – đã khóa thao tác"
 }

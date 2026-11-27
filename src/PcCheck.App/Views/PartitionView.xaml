@@ -161,7 +161,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- ============ Sơ đồ các ổ ============ -->
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
                 <StackPanel>
                     <!-- Cảnh báo sao lưu -->
                     <Border Style="{StaticResource SubCard}" Background="{StaticResource WarningSoftBrush}" Margin="0,0,0,12">
@@ -328,7 +328,7 @@
 
             <!-- ============ Bảng thao tác ============ -->
             <Border Grid.Column="2" Style="{StaticResource Card}" Padding="18,16" VerticalAlignment="Stretch">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
                     <StackPanel>
                         <!-- Chưa chọn gì -->
                         <StackPanel Visibility="{Binding NoSelection, Converter={StaticResource BoolToVis}}">

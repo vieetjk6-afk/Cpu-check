@@ -56,6 +56,15 @@ public sealed class PhysicalDiskInfo
     /// <summary>Vùng trống chưa phân vùng (do PartitionLayout tính).</summary>
     public List<FreeRegion> FreeRegions { get; set; } = [];
 
+    /// <summary>Số phân vùng Windows báo cho ổ (MSFT_Disk.NumberOfPartitions) – để phát hiện đọc thiếu.</summary>
+    public int? ReportedPartitions { get; init; }
+
+    /// <summary>
+    /// Không đọc đủ bảng phân vùng (Windows báo có phân vùng nhưng không đọc được). Khi đó ứng dụng không cho thao tác gì trên ổ
+    /// và không hiện vùng trống – tránh coi nhầm ổ đang có dữ liệu là ổ trống.
+    /// </summary>
+    public bool PartitionsUnreadable => ReportedPartitions is { } n && n > Partitions.Count;
+
     public long AllocatedBytes => Partitions.Where(p => p.Kind != PartitionKind.Extended).Sum(p => p.Size);
 }
 
