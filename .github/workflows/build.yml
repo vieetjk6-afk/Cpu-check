@@ -6,6 +6,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Phát hành bản mới (vd 1.1.0 – tự tạo tag v1.1.0 và GitHub Release). Để trống = chỉ build."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -24,14 +29,34 @@ jobs:
           dotnet-version: "10.0.x"
 
       # Tag "v1.2.3" -> phiên bản 1.2.3 được ghi vào ứng dụng (trình cập nhật so sánh với bản phát hành mới nhất).
+      # Chạy tay (workflow_dispatch) với release_version = "1.2.3" -> tạo tag v1.2.3 + Release, chỉ trên nhánh mặc định.
       - name: Version
         id: version
         shell: pwsh
+        env:
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE_INPUT: ${{ github.event.inputs.release_version }}
         run: |
           $v = ""
-          if ("${{ github.ref }}" -like "refs/tags/v*") { $v = ("${{ github.ref_name }}".Substring(1) -replace '[-+].*$', '') }
+          $tag = ""
+          if ($env:REF -like "refs/tags/v*") {
+            $tag = $env:REF_NAME
+            $v = ($tag.Substring(1) -replace '[-+].*$', '')
+          }
+          elseif ($env:RELEASE_INPUT) {
+            $ver = $env:RELEASE_INPUT.Trim().TrimStart('v')
+            if ($ver -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$') { throw "release_version không hợp lệ: '$ver' (dạng 1.2.3 hoặc 1.2.3-beta)" }
+            if ($env:REF_NAME -ne $env:DEFAULT_BRANCH) { throw "Chỉ phát hành từ nhánh mặc định ($env:DEFAULT_BRANCH), đang ở $env:REF_NAME" }
+            if (git ls-remote --tags origin "refs/tags/v$ver") { throw "Tag v$ver đã tồn tại" }
+            $tag = "v$ver"
+            $v = ($ver -replace '[-+].*$', '')
+          }
           if ($v) { "args=-p:Version=$v" >> $env:GITHUB_OUTPUT } else { "args=" >> $env:GITHUB_OUTPUT }
-          Write-Host "Version: $(if ($v) { $v } else { 'default (Directory.Build.props)' })"
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "prerelease=$(if ($tag.Contains('-')) { 'true' } else { 'false' })" >> $env:GITHUB_OUTPUT
+          Write-Host "Version: $(if ($v) { $v } else { 'default (Directory.Build.props)' }) Tag: $tag"
 
       - name: Restore
         run: dotnet restore PcCheck.sln
@@ -88,12 +113,15 @@ jobs:
           path: publish/small/
 
       - name: GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.version.outputs.tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          # Chạy tay: tag được tạo mới trên đúng commit vừa build.
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
           # Tag kiểu v1.3.0-beta -> pre-release: trình cập nhật trong ứng dụng bỏ qua.
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ steps.version.outputs.prerelease }}
           files: |
             publish/PcCheck-portable-win-x64.zip
             publish/PcCheck-small-win-x64.zip
