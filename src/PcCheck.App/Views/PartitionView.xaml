@@ -1,0 +1,520 @@
+<UserControl x:Class="PcCheck.App.Views.PartitionView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:PcCheck.App.Infrastructure"
+             xmlns:c="clr-namespace:PcCheck.App.Controls">
+    <UserControl.Resources>
+        <!-- Màu theo loại phân vùng (dải màu trên sơ đồ, chấm màu ở bảng). -->
+        <Style x:Key="KindColor" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource TextMutedBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding KindKey}" Value="windows">
+                    <Setter Property="Background" Value="{StaticResource InfoBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding KindKey}" Value="data">
+                    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding KindKey}" Value="efi">
+                    <Setter Property="Background" Value="{StaticResource WarningBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding KindKey}" Value="recovery">
+                    <Setter Property="Background" Value="{StaticResource SuccessBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding KindKey}" Value="dynamic">
+                    <Setter Property="Background" Value="{StaticResource DangerBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding KindKey}" Value="free">
+                    <Setter Property="Background" Value="{DynamicResource LineBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Ô phân vùng trên sơ đồ -->
+        <Style x:Key="SegmentTile" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{DynamicResource CardAltBrush}" BorderBrush="{DynamicResource LineBrush}"
+                                BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource CardHoverBrush}" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsFree}" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="Transparent" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Dòng trong bảng phân vùng -->
+        <Style x:Key="RowButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="7" Padding="8,6">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource CardAltBrush}" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Nút thao tác ở bảng bên phải -->
+        <Style x:Key="ActionButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+        </Style>
+
+        <DataTemplate x:Key="ActionTemplate">
+            <Button Command="{Binding Command}" IsEnabled="{Binding IsEnabled}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource ActionButton}">
+                        <Setter Property="ToolTip" Value="{Binding Reason}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Reason}" Value="">
+                                <Setter Property="ToolTip" Value="{x:Null}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="22" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Glyph}" FontSize="13" HorizontalAlignment="Left">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsDanger}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Grid.Column="1" Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                </Grid>
+            </Button>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid Margin="32,28,32,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Tiêu đề -->
+        <Grid Margin="0,0,0,18">
+            <StackPanel Margin="0,0,320,0">
+                <TextBlock Text="{l:T page.partitions.title}" Style="{StaticResource H1}" />
+                <TextBlock Text="{l:T page.partitions.subtitle}" Style="{StaticResource Body}" Margin="0,4,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <Button Command="{Binding OpenDiskManagementCommand}" Margin="0,0,8,0" ToolTip="diskmgmt.msc">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE8A7;" FontSize="13" />
+                        <TextBlock Text="{l:T part.disk_management}" Margin="8,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding RefreshCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" FontSize="13" />
+                        <TextBlock Text="{l:T part.refresh}" Margin="8,0,0,0" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="340" />
+            </Grid.ColumnDefinitions>
+
+            <!-- ============ Sơ đồ các ổ ============ -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
+                    <!-- Cảnh báo sao lưu -->
+                    <Border Style="{StaticResource SubCard}" Background="{StaticResource WarningSoftBrush}" Margin="0,0,0,12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE7BA;" FontSize="15" Foreground="{StaticResource WarningBrush}" VerticalAlignment="Top" Margin="0,1,10,0" />
+                            <TextBlock Grid.Column="1" Text="{l:T part.backup_warning}" Style="{StaticResource Body}" TextWrapping="Wrap" />
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource SubCard}" Background="{StaticResource DangerSoftBrush}" Margin="0,0,0,12"
+                            Visibility="{Binding IsAdmin, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                        <TextBlock Text="{l:T part.need_admin}" Style="{StaticResource Body}" TextWrapping="Wrap" />
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="{l:T part.loading}" Style="{StaticResource H3}" />
+                            <ProgressBar Margin="0,12,0,0" IsIndeterminate="True" Height="4" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="{l:T part.empty}" Style="{StaticResource Body}" TextWrapping="Wrap" />
+                    </Border>
+
+                    <ItemsControl ItemsSource="{Binding Disks}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource Card}" Margin="0,0,0,12" Padding="18,16">
+                                    <StackPanel>
+                                        <!-- Tiêu đề ổ -->
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="38" Height="38" CornerRadius="10" Background="{DynamicResource AccentSoftBrush}">
+                                                <TextBlock Style="{StaticResource Icon}" Text="&#xEDA2;" FontSize="17" Foreground="{DynamicResource AccentBrush}" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Title}" Style="{StaticResource H3}" MaxWidth="420" />
+                                                    <ItemsControl ItemsSource="{Binding Badges}" Focusable="False" Margin="8,0,0,0">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <StackPanel Orientation="Horizontal" />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border Style="{StaticResource Badge}" Background="{DynamicResource AccentSoftBrush}" Margin="0,0,6,0">
+                                                                    <TextBlock Text="{Binding}" FontSize="11" Foreground="{DynamicResource AccentBrush}" />
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}" Margin="0,2,0,0" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2" Text="{Binding Summary}" Style="{StaticResource Caption}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                        </Grid>
+
+                                        <!-- Ổ chưa khởi tạo -->
+                                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0" Visibility="{Binding IsRaw, Converter={StaticResource BoolToVis}}">
+                                            <Button Style="{StaticResource PrimaryButton}" Content="{l:T part.init_gpt}" Margin="0,0,8,0"
+                                                    Command="{Binding DataContext.InitGptCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                            <Button Content="{l:T part.init_mbr}"
+                                                    Command="{Binding DataContext.InitMbrCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                        </StackPanel>
+
+                                        <!-- Sơ đồ phân vùng -->
+                                        <ItemsControl ItemsSource="{Binding Segments}" Focusable="False" Margin="0,14,0,0" Height="78"
+                                                      Visibility="{Binding Segments.Count, Converter={StaticResource EmptyToCollapsed}}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <c:ProportionalPanel MinItemWidth="58" Spacing="4" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemContainerStyle>
+                                                <Style TargetType="ContentPresenter">
+                                                    <Setter Property="c:ProportionalPanel.Weight" Value="{Binding Weight}" />
+                                                </Style>
+                                            </ItemsControl.ItemContainerStyle>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Style="{StaticResource SegmentTile}" ToolTip="{Binding Tooltip}"
+                                                            Command="{Binding DataContext.SelectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}">
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="5" />
+                                                                <RowDefinition Height="*" />
+                                                                <RowDefinition Height="Auto" />
+                                                            </Grid.RowDefinitions>
+                                                            <Border Style="{StaticResource KindColor}" />
+                                                            <StackPanel Grid.Row="1" Margin="8,6,8,0">
+                                                                <TextBlock Text="{Binding Short}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextBrush}" />
+                                                                <TextBlock Text="{Binding SizeText}" Style="{StaticResource Caption}" FontSize="11" Margin="0,2,0,0" />
+                                                            </StackPanel>
+                                                            <ProgressBar Grid.Row="2" Height="4" Margin="8,0,8,7" Maximum="100" Value="{Binding UsedPercent, Mode=OneWay}"
+                                                                         Visibility="{Binding HasUsage, Converter={StaticResource BoolToVis}}" />
+                                                        </Grid>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <!-- Bảng phân vùng -->
+                                        <Grid Margin="8,14,8,4" Visibility="{Binding Segments.Count, Converter={StaticResource EmptyToCollapsed}}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="22" />
+                                                <ColumnDefinition Width="2*" />
+                                                <ColumnDefinition Width="1.4*" />
+                                                <ColumnDefinition Width="70" />
+                                                <ColumnDefinition Width="86" />
+                                                <ColumnDefinition Width="86" />
+                                                <ColumnDefinition Width="1.6*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="1" Text="{l:T part.col.name}" Style="{StaticResource Caption}" />
+                                            <TextBlock Grid.Column="2" Text="{l:T part.col.type}" Style="{StaticResource Caption}" />
+                                            <TextBlock Grid.Column="3" Text="{l:T part.col.fs}" Style="{StaticResource Caption}" />
+                                            <TextBlock Grid.Column="4" Text="{l:T part.col.size}" Style="{StaticResource Caption}" />
+                                            <TextBlock Grid.Column="5" Text="{l:T part.col.used}" Style="{StaticResource Caption}" />
+                                            <TextBlock Grid.Column="6" Text="{l:T part.col.status}" Style="{StaticResource Caption}" />
+                                        </Grid>
+                                        <ItemsControl ItemsSource="{Binding Segments}" Focusable="False">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Style="{StaticResource RowButton}" ToolTip="{Binding Tooltip}"
+                                                            Command="{Binding DataContext.SelectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="22" />
+                                                                <ColumnDefinition Width="2*" />
+                                                                <ColumnDefinition Width="1.4*" />
+                                                                <ColumnDefinition Width="70" />
+                                                                <ColumnDefinition Width="86" />
+                                                                <ColumnDefinition Width="86" />
+                                                                <ColumnDefinition Width="1.6*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <Border Style="{StaticResource KindColor}" Width="10" Height="10" CornerRadius="3" HorizontalAlignment="Left" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Title}" Foreground="{DynamicResource TextBrush}" FontSize="13" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                                                            <TextBlock Grid.Column="2" Text="{Binding KindText}" Style="{StaticResource Caption}" Margin="0,0,8,0" />
+                                                            <TextBlock Grid.Column="3" Text="{Binding FileSystem}" Style="{StaticResource Caption}" />
+                                                            <TextBlock Grid.Column="4" Text="{Binding SizeText}" Foreground="{DynamicResource TextBrush}" FontSize="12.5" />
+                                                            <TextBlock Grid.Column="5" Text="{Binding UsedText}" Style="{StaticResource Caption}" />
+                                                            <TextBlock Grid.Column="6" Text="{Binding Flags}" Style="{StaticResource Caption}" />
+                                                        </Grid>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ============ Bảng thao tác ============ -->
+            <Border Grid.Column="2" Style="{StaticResource Card}" Padding="18,16" VerticalAlignment="Stretch">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
+                        <!-- Chưa chọn gì -->
+                        <StackPanel Visibility="{Binding NoSelection, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xECA5;" FontSize="28" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Left" />
+                            <TextBlock Text="{l:T part.select_title}" Style="{StaticResource H3}" Margin="0,12,0,0" />
+                            <TextBlock Text="{l:T part.select_hint}" Style="{StaticResource Body}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                        </StackPanel>
+
+                        <StackPanel Visibility="{Binding HasSelection, Converter={StaticResource BoolToVis}}">
+                            <!-- Thông tin mục đang chọn -->
+                            <Grid DataContext="{Binding Selected}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource KindColor}" Width="6" CornerRadius="3" Margin="0,2,10,2" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{Binding Title}" Style="{StaticResource H2}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding KindText}" Style="{StaticResource Caption}" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding SelectedDetails}" Focusable="False" Margin="0,12,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,0,0,5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="110" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Key}" Style="{StaticResource Caption}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="{DynamicResource TextBrush}" FontSize="12.5" TextWrapping="Wrap" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- Kết quả thao tác gần nhất -->
+                            <Border CornerRadius="8" Padding="10,8" Margin="0,10,0,0" Visibility="{Binding ResultText, Converter={StaticResource EmptyToCollapsed}}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="{StaticResource SuccessSoftBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ResultIsError}" Value="True">
+                                                <Setter Property="Background" Value="{StaticResource DangerSoftBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBox Text="{Binding ResultText, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent"
+                                         Padding="0" FontSize="12" Foreground="{DynamicResource TextBrush}" />
+                            </Border>
+
+                            <!-- Đang chạy -->
+                            <StackPanel Margin="0,14,0,0" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{Binding BusyText}" Style="{StaticResource Body}" TextWrapping="Wrap" />
+                                <ProgressBar Margin="0,10,0,0" IsIndeterminate="True" Height="4" />
+                                <TextBlock Text="{l:T part.busy_hint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                            </StackPanel>
+
+                            <!-- Thao tác -->
+                            <StackPanel Margin="0,16,0,0" Visibility="{Binding ShowActions, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{l:T part.actions}" Style="{StaticResource Caption}" Margin="0,0,0,8" />
+                                <ItemsControl ItemsSource="{Binding Actions}" ItemTemplate="{StaticResource ActionTemplate}" Focusable="False" />
+                                <StackPanel Visibility="{Binding DiskActions.Count, Converter={StaticResource EmptyToCollapsed}}">
+                                    <TextBlock Text="{l:T part.disk_actions}" Style="{StaticResource Caption}" Margin="0,10,0,8" />
+                                    <ItemsControl ItemsSource="{Binding DiskActions}" ItemTemplate="{StaticResource ActionTemplate}" Focusable="False" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Trình chỉnh sửa -->
+                            <StackPanel Margin="0,16,0,0">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsEditing}" Value="True" />
+                                                    <Condition Binding="{Binding IsBusy}" Value="False" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Text="{Binding EditorTitle}" Style="{StaticResource H3}" />
+                                <TextBlock Text="{Binding EditorHint}" Style="{StaticResource Body}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                           Visibility="{Binding EditorHint, Converter={StaticResource EmptyToCollapsed}}" />
+
+                                <!-- Kích thước -->
+                                <StackPanel Margin="0,12,0,0" Visibility="{Binding ShowSize, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{l:T part.size_gb}" Style="{StaticResource Caption}" Margin="0,0,0,6" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Text="{Binding SizeText, UpdateSourceTrigger=PropertyChanged}" />
+                                        <Button Grid.Column="1" Content="{l:T part.size_min}" Command="{Binding MinSizeCommand}" Margin="6,0,0,0" Padding="10,6" />
+                                        <Button Grid.Column="2" Content="{l:T part.size_max}" Command="{Binding MaxSizeCommand}" Margin="6,0,0,0" Padding="10,6" />
+                                    </Grid>
+                                    <Slider Margin="0,10,0,0" Minimum="{Binding SizeMinGb}" Maximum="{Binding SizeMaxGb}" Value="{Binding SizeGb}" />
+                                    <TextBlock Text="{Binding SizeRangeText}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                    <TextBlock Text="{Binding SizeChangeText}" Foreground="{DynamicResource AccentBrush}" FontSize="12.5" Margin="0,4,0,0"
+                                               Visibility="{Binding SizeChangeText, Converter={StaticResource EmptyToCollapsed}}" />
+                                </StackPanel>
+
+                                <!-- Hệ thống tệp -->
+                                <StackPanel Margin="0,12,0,0" Visibility="{Binding ShowFileSystem, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{l:T part.fs}" Style="{StaticResource Caption}" Margin="0,0,0,6" />
+                                    <Border Style="{StaticResource SegmentHost}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton Style="{StaticResource SegmentButton}" GroupName="PartFs" Content="NTFS"
+                                                         IsChecked="{Binding FileSystem, Converter={StaticResource Equals}, ConverterParameter=NTFS}" />
+                                            <RadioButton Style="{StaticResource SegmentButton}" GroupName="PartFs" Content="exFAT"
+                                                         IsChecked="{Binding FileSystem, Converter={StaticResource Equals}, ConverterParameter=exFAT}" />
+                                            <RadioButton Style="{StaticResource SegmentButton}" GroupName="PartFs" Content="FAT32"
+                                                         IsChecked="{Binding FileSystem, Converter={StaticResource Equals}, ConverterParameter=FAT32}" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- Nhãn -->
+                                <StackPanel Margin="0,12,0,0" Visibility="{Binding ShowLabel, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{l:T part.label}" Style="{StaticResource Caption}" Margin="0,0,0,6" />
+                                    <TextBox Text="{Binding LabelText, UpdateSourceTrigger=PropertyChanged}" MaxLength="{Binding LabelMax}" />
+                                </StackPanel>
+
+                                <!-- Ký tự ổ -->
+                                <StackPanel Margin="0,12,0,0" Visibility="{Binding ShowLetters, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{l:T part.letter}" Style="{StaticResource Caption}" Margin="0,0,0,6" />
+                                    <ItemsControl ItemsSource="{Binding Letters}" Focusable="False">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Style="{StaticResource SegmentHost}" Margin="0,0,4,4" Padding="1">
+                                                    <RadioButton Style="{StaticResource SegmentButton}" GroupName="PartLetter" Content="{Binding Text}" IsChecked="{Binding IsSelected}" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+
+                                <!-- Format đầy đủ -->
+                                <CheckBox Margin="0,12,0,0" IsChecked="{Binding FullFormat}" Visibility="{Binding ShowFullFormat, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{l:T part.full_format}" TextWrapping="Wrap" />
+                                </CheckBox>
+
+                                <!-- Gộp -->
+                                <StackPanel Margin="0,12,0,0" Visibility="{Binding ShowMerge, Converter={StaticResource BoolToVis}}">
+                                    <CheckBox IsChecked="{Binding MergeCopy}" IsEnabled="{Binding MergeCanCopy}">
+                                        <TextBlock Text="{Binding MergeCopyText}" TextWrapping="Wrap" />
+                                    </CheckBox>
+                                    <Border Style="{StaticResource SubCard}" Background="{StaticResource DangerSoftBrush}" Margin="0,10,0,0"
+                                            Visibility="{Binding MergeNoCopyText, Converter={StaticResource EmptyToCollapsed}}">
+                                        <TextBlock Text="{Binding MergeNoCopyText}" Style="{StaticResource Body}" TextWrapping="Wrap" />
+                                    </Border>
+                                </StackPanel>
+
+                                <TextBlock Text="{Binding EditorError}" Foreground="{StaticResource DangerBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,10,0,0"
+                                           Visibility="{Binding EditorError, Converter={StaticResource EmptyToCollapsed}}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                    <Button Command="{Binding ApplyCommand}" Content="{l:T part.apply}" Margin="0,0,8,0">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ApplyIsDanger}" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource DangerBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                    <Button Command="{Binding CancelEditCommand}" Content="{l:T dialog.cancel}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
