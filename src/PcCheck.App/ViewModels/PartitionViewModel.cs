@@ -52,6 +52,7 @@ public sealed class SegmentItem : ObservableObject
         {
             KindKey = "free";
             KindText = Loc.T("part.kind.free");
+            Flags = "";
             Title = KindText;
             FileSystem = "";
             Number = "";
