@@ -1719,5 +1719,7 @@
   "part.block.move_source": "The next partition must be a data partition with a drive letter, formatted NTFS/exFAT/FAT32.",
   "part.block.move_no_free": "There's no unallocated space right after the partition to move.",
   "part.block.move_no_room": "The free space is smaller than the data on the partition to move (+1 GB) – free up some data or use Merge.",
-  "part.block.mbr_full": "The MBR disk already has 4 primary partitions – no new partition can be created."
+  "part.block.mbr_full": "The MBR disk already has 4 primary partitions – no new partition can be created.",
+  "part.block.unreadable": "This disk's partition table couldn't be read – all actions are locked for safety. Click Refresh or use Disk Management.",
+  "part.unreadable_hint": "Partitions couldn't be read – actions locked"
 }

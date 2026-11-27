@@ -52,6 +52,7 @@ public sealed class SegmentItem : ObservableObject
         {
             KindKey = "free";
             KindText = Loc.T("part.kind.free");
+            Flags = "";
             Title = KindText;
             FileSystem = "";
             Number = "";
@@ -108,7 +109,9 @@ public sealed class DiskItem
         };
         Detail = string.Join(" · ", new[] { Format.Bytes(disk.Size), style, disk.Bus }.Where(s => s.Length > 0));
         var free = disk.FreeRegions.Sum(r => r.Size);
-        Summary = disk.Style == PartitionStyle.Raw
+        Summary = disk.PartitionsUnreadable
+            ? Loc.T("part.unreadable_hint")
+            : disk.Style == PartitionStyle.Raw
             ? Loc.T("part.raw_hint")
             : Loc.F("part.disk_summary", disk.Partitions.Count(p => p.Kind != PartitionKind.Extended), Format.Bytes(free));
 
@@ -434,7 +437,8 @@ public sealed class PartitionViewModel : PageViewModel
             DiskActions.Add(new PartitionAction("online", "", Loc.T("part.action.online"), null, false, new RelayCommand(() => _ = SetOnlineAsync(disk))));
         }
 
-        if (disk.Style != PartitionStyle.Raw && disk.Partitions.Count == 0)
+        // Chỉ ổ thật sự trống: Windows cũng báo 0 phân vùng, không phải ổ hệ thống, đọc đủ bảng phân vùng.
+        if (disk.Style != PartitionStyle.Raw && disk.Partitions.Count == 0 && disk.ReportedPartitions == 0 && !disk.IsSystemDisk && !disk.PartitionsUnreadable)
         {
             var target = disk.Style == PartitionStyle.Gpt ? PartitionStyle.Mbr : PartitionStyle.Gpt;
             DiskActions.Add(new PartitionAction("convert_style", "", Loc.F("part.action.convert_style", target.ToString().ToUpperInvariant()), null, false,
@@ -442,7 +446,7 @@ public sealed class PartitionViewModel : PageViewModel
         }
         else if (disk.Style == PartitionStyle.Mbr)
         {
-            var blocker = disk.IsSystemDisk ? null : "part.block.mbr2gpt_data";
+            var blocker = disk.PartitionsUnreadable ? "part.block.unreadable" : disk.IsSystemDisk ? null : "part.block.mbr2gpt_data";
             DiskActions.Add(new PartitionAction("mbr2gpt", "", Loc.T("part.action.mbr2gpt"), blocker, true, new RelayCommand(() => _ = Mbr2GptAsync(disk))));
         }
 

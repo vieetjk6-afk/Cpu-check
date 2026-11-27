@@ -417,6 +417,63 @@ public sealed class PartitionTests
         Assert.Empty(usb.FreeRegions);
     }
 
+    /// <summary>
+    /// Câu truy vấn chỉ được dùng thuộc tính WMI có thật – một thuộc tính sai (vd "Type", vốn chỉ là cột PowerShell)
+    /// làm Windows từ chối cả câu và mọi ổ hiện "0 phân vùng".
+    /// </summary>
+    [Theory]
+    [InlineData(nameof(PartitionReader.DiskQuery), "MSFT_Disk", "Number,FriendlyName,Model,Size,AllocatedSize,PartitionStyle,IsOffline,IsReadOnly,IsBoot,IsSystem,BusType,NumberOfPartitions,LargestFreeExtent,UniqueId,Path")]
+    [InlineData(nameof(PartitionReader.PartitionQuery), "MSFT_Partition", "DiskNumber,PartitionNumber,Offset,Size,GptType,MbrType,DriveLetter,IsActive,IsBoot,IsSystem,IsHidden,IsReadOnly,IsOffline,AccessPaths,Guid,NoDefaultDriveLetter,OperationalStatus,TransitionState")]
+    [InlineData(nameof(PartitionReader.VolumeQuery), "MSFT_Volume", "Path,DriveLetter,FileSystemLabel,FileSystem,FileSystemType,Size,SizeRemaining,HealthStatus,DriveType")]
+    public void WmiQueriesOnlyUseRealProperties(string field, string cls, string known)
+    {
+        var query = field switch
+        {
+            nameof(PartitionReader.DiskQuery) => PartitionReader.DiskQuery,
+            nameof(PartitionReader.PartitionQuery) => PartitionReader.PartitionQuery,
+            _ => PartitionReader.VolumeQuery,
+        };
+        Assert.EndsWith("FROM " + cls, query);
+        var props = query["SELECT ".Length..query.IndexOf(" FROM", StringComparison.Ordinal)].Split(',', StringSplitOptions.TrimEntries);
+        var allowed = known.Split(',');
+        Assert.Empty(props.Except(allowed));
+    }
+
+    /// <summary>Chạy trên Windows (CI windows-latest): phải đọc được phân vùng thật, có phân vùng Windows.</summary>
+    [Fact]
+    public void ReadsRealPartitionsOnWindows()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        Assert.NotEmpty(Wmi.Query(PartitionReader.PartitionQuery, Wmi.Storage));
+        var disks = PartitionReader.Read();
+        Assert.Contains(disks, d => d.Partitions.Count > 0);
+        Assert.Contains(disks.SelectMany(d => d.Partitions), p => p.IsWindows);
+        Assert.DoesNotContain(disks, d => d.PartitionsUnreadable);
+    }
+
+    [Fact]
+    public void DiskThatReportsPartitionsButReadsNoneIsLocked()
+    {
+        var disk = new PhysicalDiskInfo { Number = 3, Size = 932 * GiB, Style = PartitionStyle.Gpt, IsSystemDisk = true, Partitions = [], ReportedPartitions = 4 };
+        disk.FreeRegions = PartitionLayout.FreeRegions(disk);
+        Assert.True(disk.PartitionsUnreadable);
+        Assert.Empty(disk.FreeRegions); // không được hiện cả ổ là "chưa phân vùng"
+        var p = Part(1, MiB, GiB, letter: 'E');
+        Assert.Equal("part.block.unreadable", PartitionLayout.Blocker(disk, p, PartitionOp.Delete));
+    }
+
+    [Fact]
+    public void PartitionsInsideExtendedAreMarkedLogical()
+    {
+        var primary = Part(1, MiB, 10 * GiB);
+        var extended = Part(2, 10 * GiB + MiB, 50 * GiB, PartitionKind.Extended, "");
+        var logical = Part(5, 10 * GiB + 2 * MiB, 20 * GiB);
+        var result = PartitionReader.MarkLogical([primary, extended, logical]);
+        Assert.False(result[0].IsLogical);
+        Assert.False(result[1].IsLogical);
+        Assert.True(result[2].IsLogical);
+    }
+
     [Fact]
     public void DynamicTranslationKeysExist()
     {

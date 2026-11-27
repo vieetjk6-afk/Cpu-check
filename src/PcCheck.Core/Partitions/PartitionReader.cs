@@ -7,11 +7,16 @@ namespace PcCheck.Core.Partitions;
 /// <summary>Đọc ổ cứng, phân vùng và volume qua WMI (root\Microsoft\Windows\Storage – cùng nguồn với Disk Management).</summary>
 public static class PartitionReader
 {
+    internal const string DiskQuery = "SELECT Number, FriendlyName, Model, Size, PartitionStyle, IsOffline, IsReadOnly, IsBoot, IsSystem, BusType, NumberOfPartitions FROM MSFT_Disk";
+    internal const string PartitionQuery = "SELECT DiskNumber, PartitionNumber, Offset, Size, GptType, MbrType, DriveLetter, IsActive, IsBoot, IsSystem, IsHidden, AccessPaths FROM MSFT_Partition";
+    internal const string VolumeQuery = "SELECT Path, DriveLetter, FileSystemLabel, FileSystem, Size, SizeRemaining FROM MSFT_Volume";
+
     public static List<PhysicalDiskInfo> Read()
     {
-        var disks = Wmi.Query("SELECT Number, FriendlyName, Model, Size, PartitionStyle, IsOffline, IsReadOnly, IsBoot, IsSystem, BusType FROM MSFT_Disk", Wmi.Storage);
-        var partitions = Wmi.Query("SELECT DiskNumber, PartitionNumber, Offset, Size, Type, GptType, MbrType, DriveLetter, IsActive, IsBoot, IsSystem, IsHidden, AccessPaths FROM MSFT_Partition", Wmi.Storage);
-        var volumes = Wmi.Query("SELECT Path, DriveLetter, FileSystemLabel, FileSystem, Size, SizeRemaining FROM MSFT_Volume", Wmi.Storage);
+        var disks = Wmi.Query(DiskQuery, Wmi.Storage);
+        // Lưu ý: "Type" KHÔNG phải thuộc tính WMI của MSFT_Partition (chỉ là cột PowerShell tự tính) – đưa vào là cả câu truy vấn bị từ chối.
+        var partitions = Wmi.Query(PartitionQuery, Wmi.Storage);
+        var volumes = Wmi.Query(VolumeQuery, Wmi.Storage);
         var pageFiles = Wmi.Query("SELECT Name FROM Win32_PageFileUsage")
             .Select(r => r.Str("Name"))
             .Where(n => n.Length > 1 && n[1] == ':')
@@ -52,7 +57,7 @@ public static class PartitionReader
                              ?? (letter is { } l ? volumesByLetter.GetValueOrDefault(l) : null);
                 var mbrType = p.Int("MbrType") ?? 0;
                 var gptType = p.Str("GptType");
-                var typeName = p.Str("Type");
+                var typeName = p.Str("Type"); // chỉ có trong dữ liệu kiểm thử / nguồn khác WMI
                 var kind = PartitionLayout.Classify(gptType, mbrType, typeName);
                 var isWindows = (p.Bool("IsBoot") ?? false) || (letter is { } wl && wl == windowsLetter);
                 parts.Add(new PartitionInfo
@@ -81,6 +86,7 @@ public static class PartitionReader
             }
 
             parts.Sort((a, b) => a.Offset.CompareTo(b.Offset));
+            parts = MarkLogical(parts);
             var bus = d.Int("BusType") ?? 0;
             var name = d.Str("FriendlyName");
             var disk = new PhysicalDiskInfo
@@ -100,12 +106,30 @@ public static class PartitionReader
                 IsSystemDisk = (d.Bool("IsBoot") ?? false) || (d.Bool("IsSystem") ?? false) || parts.Any(p => p.IsWindows || p.IsBootLoader),
                 IsRemovable = bus is 7 or 12 or 13,
                 Partitions = parts,
+                ReportedPartitions = d.Int("NumberOfPartitions"),
             };
             disk.FreeRegions = PartitionLayout.FreeRegions(disk);
             result.Add(disk);
         }
 
         return result;
+    }
+
+    /// <summary>Phân vùng MBR nằm trong vùng của phân vùng mở rộng (Extended) là phân vùng logic.</summary>
+    internal static List<PartitionInfo> MarkLogical(List<PartitionInfo> parts)
+    {
+        var extended = parts.Where(p => p.Kind == PartitionKind.Extended).ToList();
+        if (extended.Count == 0) return parts;
+        return parts.Select(p => !p.IsLogical && p.Kind != PartitionKind.Extended && extended.Any(e => p.Offset >= e.Offset && p.End <= e.End)
+            ? new PartitionInfo
+            {
+                DiskNumber = p.DiskNumber, PartitionNumber = p.PartitionNumber, Offset = p.Offset, Size = p.Size, Kind = p.Kind,
+                TypeName = p.TypeName, GptType = p.GptType, MbrType = p.MbrType, DriveLetter = p.DriveLetter, Label = p.Label,
+                FileSystem = p.FileSystem, FreeBytes = p.FreeBytes, IsWindows = p.IsWindows, IsBootLoader = p.IsBootLoader,
+                IsActive = p.IsActive, IsHidden = p.IsHidden, IsLogical = true, HasPageFile = p.HasPageFile, HasThisApp = p.HasThisApp,
+                VolumePath = p.VolumePath,
+            }
+            : p).ToList();
     }
 
     /// <summary>DriveLetter của MSFT_Partition/MSFT_Volume là char16: có thể là char, số (mã ký tự) hoặc '\0'.</summary>

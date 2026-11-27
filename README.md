@@ -33,7 +33,7 @@ Phần mềm kiểm tra máy tính Windows: xem thông tin phần cứng, theo d
 
    Khi tạo tag `v*` (ví dụ `v1.0.0`), workflow tự tạo GitHub Release kèm 2 tệp zip và ghi chú thay đổi, đồng thời ghi số phiên bản đó vào ứng dụng.
 
-   **Phát hành bản mới để người dùng tự cập nhật:** tăng số phiên bản và đẩy tag, ví dụ `git tag v1.1.0 && git push origin v1.1.0`. Ứng dụng so sánh phiên bản đang chạy với bản phát hành mới nhất (bỏ qua bản nháp / pre-release) và tải tệp `PcCheck-portable-win-x64.zip` hoặc `PcCheck-small-win-x64.zip` tùy bản đang dùng. Bản tải từ tab Actions (không qua tag) mang số phiên bản mặc định trong `Directory.Build.props`.
+   **Phát hành bản mới để người dùng tự cập nhật:** đẩy tag, ví dụ `git tag v1.1.0 && git push origin v1.1.0`, hoặc không cần git: tab **Actions** → **Build** → **Run workflow** trên nhánh mặc định, nhập `release_version` (vd `1.1.0`) – workflow tự build, tạo tag `v1.1.0` và Release. Ứng dụng so sánh phiên bản đang chạy với bản phát hành mới nhất (bỏ qua bản nháp / pre-release) và tải tệp `PcCheck-portable-win-x64.zip` hoặc `PcCheck-small-win-x64.zip` tùy bản đang dùng. Bản tải từ tab Actions (không qua tag) mang số phiên bản mặc định trong `Directory.Build.props`.
 2. Chạy `PcCheck.exe` → đồng ý quyền quản trị (UAC). Ứng dụng tự quét lần đầu (5–15 giây).
 3. **Nhiệt độ CPU – không cần tự cài phần mềm ngoài:**
    - Ngay khi mở, PC Check đọc **nhiệt độ ước lượng từ vùng nhiệt ACPI** của Windows (không cần driver; ghi chú "ước lượng"). Con số này do firmware báo nên có thể thấp/chậm hơn nhiệt độ thật, vì vậy ứng dụng không báo đỏ chỉ dựa trên nó.
