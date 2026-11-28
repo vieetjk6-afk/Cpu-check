@@ -14,6 +14,7 @@ public static class Pages
     public const string Cleanup = "cleanup";
     public const string Storage = "storage";
     public const string Partitions = "partitions";
+    public const string Performance = "performance";
     public const string Software = "software";
     public const string Startup = "startup";
     public const string Issues = "issues";

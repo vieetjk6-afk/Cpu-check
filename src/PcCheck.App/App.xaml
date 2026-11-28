@@ -236,6 +236,7 @@
             <DataTemplate DataType="{x:Type vm:CleanupViewModel}"><views:CleanupView /></DataTemplate>
             <DataTemplate DataType="{x:Type vm:StorageViewModel}"><views:StorageView /></DataTemplate>
             <DataTemplate DataType="{x:Type vm:PartitionViewModel}"><views:PartitionView /></DataTemplate>
+            <DataTemplate DataType="{x:Type vm:PerformanceViewModel}"><views:PerformanceView /></DataTemplate>
             <DataTemplate DataType="{x:Type vm:IssuesViewModel}"><views:IssuesView /></DataTemplate>
             <DataTemplate DataType="{x:Type vm:SecurityViewModel}"><views:SecurityView /></DataTemplate>
             <DataTemplate DataType="{x:Type vm:SettingsViewModel}"><views:SettingsView /></DataTemplate>
