@@ -67,6 +67,7 @@ public sealed class MainViewModel : ObservableObject
         Cleanup = new CleanupViewModel(this);
         Storage = new StorageViewModel(this);
         Partitions = new PartitionViewModel(this);
+        Performance = new PerformanceViewModel(this);
         Issues = new IssuesViewModel(this);
         Security = new SecurityViewModel(this);
         Settings = new SettingsViewModel(this);
@@ -77,6 +78,7 @@ public sealed class MainViewModel : ObservableObject
         [
             new(Pages.Dashboard, "nav.dashboard", "", Dashboard),
             new(Pages.Hardware, "nav.hardware", "", Hardware),
+            new(Pages.Performance, "nav.performance", "\uEC4A", Performance),
             new(Pages.Health, "nav.health", "", Health),
             new(Pages.Compatibility, "nav.compatibility", "", Compatibility),
             new(Pages.Drivers, "nav.drivers", "", Drivers),
@@ -130,6 +132,7 @@ public sealed class MainViewModel : ObservableObject
     public CleanupViewModel Cleanup { get; }
     public StorageViewModel Storage { get; }
     public PartitionViewModel Partitions { get; }
+    public PerformanceViewModel Performance { get; }
     public IssuesViewModel Issues { get; }
     public SecurityViewModel Security { get; }
     public SettingsViewModel Settings { get; }
@@ -237,6 +240,9 @@ public sealed class MainViewModel : ObservableObject
 
         SelectedNav = page == Pages.Settings ? SettingsNav : NavItems.FirstOrDefault(n => n.Key == page) ?? NavItems[0];
     }
+
+    /// <summary>Chạy một hành động khắc phục (có hỏi xác nhận nếu cần) và chờ xong – để trang gọi kiểm tra lại sau đó.</summary>
+    public Task RunFixAsync(FixAction action) => ExecuteFixSafeAsync(action);
 
     /// <summary>Mỗi lần bấm chạy độc lập – không khóa các nút khắc phục khác trong lúc chờ.</summary>
     private async Task ExecuteFixSafeAsync(object? parameter)

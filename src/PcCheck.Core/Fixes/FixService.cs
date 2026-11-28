@@ -55,6 +55,11 @@ public static class FixService
 
     public static async Task<FixOutcome> RunToolAsync(string tool, CancellationToken ct = default)
     {
+        if (tool.StartsWith(Performance.OptimizationFixes.Prefix, StringComparison.Ordinal))
+        {
+            return await Performance.OptimizationFixes.ApplyAsync(tool[Performance.OptimizationFixes.Prefix.Length..], ct).ConfigureAwait(false);
+        }
+
         var parts = tool.Split(':', 2);
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
         switch (parts[0])
